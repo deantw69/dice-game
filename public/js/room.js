@@ -413,6 +413,9 @@ function renderBoard() {
   const g = state.game;
   if (!g) { board.innerHTML = '<p class="muted center-pad">選擇模式後開始遊戲 🎲</p>'; return; }
 
+  // 按住搖骰:放開後結果已回 → 停止轉動,讓正常渲染收尾(滾到最終點數)
+  if (rollSpin.committing && myRollRegistered()) stopRollSpin();
+
   // 話胚:初次一次開全部牌 → 靜態(不轉動);之後(重骰)點數變動才滾動
   const pokerReveal = !!(g.reveal && g.reveal.subGame === 'poker');
   const pokerInitial = pokerReveal && !pokerStaticDone;
@@ -453,6 +456,9 @@ function renderBoard() {
       (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '');
     const stage = cell.querySelector('.dice-stage');
     const info = cell.querySelector('.cell-info');
+
+    // 按住搖骰轉動中:保留我的轉動畫面,不被一般渲染覆蓋
+    if (rollSpin.active && p.id === myId) continue;
 
     // 話胚:牌型最小者加外框
     const lowPoker = g.mode === 'mixed' && g.reveal && g.reveal.subGame === 'poker'
@@ -555,8 +561,7 @@ function renderControls() {
     el.innerHTML = rolled
       ? '<p class="muted">已搖骰,等待其他玩家…</p>'
       : '<button id="roll">🎲 搖骰!</button>';
-    $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
-    return;
+    return; // 搖骰改由「按住→放開」處理(見 pressRoll/releaseRoll)
   }
 
   if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'rolling') {
@@ -568,7 +573,6 @@ function renderControls() {
         : '<button id="roll">🎲 搖骰!</button>')
       + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
       + '</div>';
-    $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
     $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
     return;
   }
@@ -580,8 +584,7 @@ function renderControls() {
       el.innerHTML = rolled
         ? '<p class="muted">已搖骰,等待其他人…</p>'
         : `<button id="roll">${label}</button>`;
-      $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
-      return;
+      return; // 搖骰改由「按住→放開」處理
     }
     if (g.phase === 'pokerCompare') {
       const low = (g.reveal && g.reveal.lowestIds) || [];
@@ -664,6 +667,70 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+// ---- 按住搖骰:按住時骰子一直轉,放開才送出搖骰並停在結果 ----
+const rollSpin = { active: false, committing: false, timer: null };
+function rollDiceCount() {
+  const g = state && state.game; if (!g) return 0;
+  if (g.mode === 'roll') return g.diceCount || 3;
+  return (g.diceLeft && g.diceLeft[myId]) || 0;
+}
+function myRollRegistered() {
+  const g = state && state.game; if (!g) return true;
+  if (g.mode === 'roll') return !!(g.rolls && g.rolls[myId]);
+  return (g.rolled || []).includes(myId);
+}
+function canRollNow() {
+  const btn = document.getElementById('roll'); // 各模式的搖骰/搖下一骰按鈕
+  return !!(btn && !btn.disabled);
+}
+function pressRoll() {
+  if (rollSpin.active || !canRollNow()) return;
+  rollSpin.active = true; rollSpin.committing = false;
+  const cell = document.querySelector(`#board [data-pid="${myId}"]`);
+  const stage = cell && cell.querySelector('.dice-stage');
+  const count = rollDiceCount();
+  if (!stage || !count) return; // 找不到也沒關係,放開時仍會送出
+  const spin = () => {
+    const vals = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 6));
+    showDice(stage, 'cell-' + myId, vals); // 連續滾隨機點數
+  };
+  spin();
+  rollSpin.timer = setInterval(spin, 360);
+}
+function releaseRoll() {
+  if (!rollSpin.active || rollSpin.committing) return;
+  rollSpin.committing = true;
+  if (!canRollNow()) { stopRollSpin(); return; }
+  emit('action', { type: 'roll' }).then((res) => {
+    if (res && res.error) { toast(res.error); stopRollSpin(); render(); }
+    // 成功 → 等 roomState 廣播,在 renderBoard 收尾停住
+  });
+}
+function stopRollSpin() {
+  if (rollSpin.timer) { clearInterval(rollSpin.timer); rollSpin.timer = null; }
+  rollSpin.active = false; rollSpin.committing = false;
+}
+
+// 滑鼠/觸控按住搖骰鈕
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest && e.target.closest('#roll')) { e.preventDefault(); pressRoll(); }
+});
+document.addEventListener('pointerup', () => releaseRoll());
+document.addEventListener('pointercancel', () => releaseRoll());
+window.addEventListener('blur', () => releaseRoll());
+
+// 空白鍵按住搖骰(打字中不觸發)
+const isSpace = (e) => e.code === 'Space' || e.key === ' ';
+document.addEventListener('keydown', (e) => {
+  if (e.repeat || !isSpace(e)) return;
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+  if (!canRollNow()) return;
+  e.preventDefault();
+  pressRoll();
+});
+document.addEventListener('keyup', (e) => { if (isSpace(e)) releaseRoll(); });
+
 // ---- 頂部按鈕 ----
 $('copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(code); toast('已複製房號 ' + code); }
@@ -685,15 +752,3 @@ $('autoNext').addEventListener('change', (e) => {
   maybeAutoNext();
 });
 
-// 電腦瀏覽器:在「搖骰」環節按空白鍵也能骰(等同點目前的搖骰按鈕)
-document.addEventListener('keydown', (e) => {
-  if (e.repeat) return;
-  if (e.code !== 'Space' && e.key !== ' ') return;
-  const ae = document.activeElement;
-  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-  const btn = document.getElementById('roll'); // 各模式的搖骰/搖下一骰按鈕
-  if (btn && !btn.disabled) {
-    e.preventDefault();
-    btn.click();
-  }
-});

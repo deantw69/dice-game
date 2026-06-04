@@ -18,7 +18,10 @@ const diceCache = new Map(); // cellKey -> { renderer, last }
 let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
 let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
 let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
+let wasNeedRoll = false;      // 上次 render 時我是否需要搖骰(用來在「剛輪到我搖骰」時播提示音)
 let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
+let autoNext = localStorage.getItem('dice.autoNext') === '1'; // 房主:自動下一場
+let autoNextTimer = null;     // 自動下一場的延遲計時器
 
 // ---- 連線 / 重連 ----
 async function doRejoin() {
@@ -149,6 +152,25 @@ function render() {
   renderControls();
   renderPokerGuide();
   renderLoserBanner();
+  maybeAutoNext();
+
+  // 輪到我搖骰(各模式 rolling 階段、含紅黑單雙「搖下一骰」)→ 提示音(同話胚)
+  const needRoll = iNeedToRoll();
+  if (needRoll && !wasNeedRoll) playAlert();
+  wasNeedRoll = needRoll;
+}
+
+// 目前是否「換我搖骰」(在進行中、非觀戰、rolling 階段且我還沒搖)
+function iNeedToRoll() {
+  const g = state.game;
+  if (!g || state.status !== 'playing' || state.you.isSpectator) return false;
+  if (g.mode === 'roll') return g.phase === 'rolling' && !(g.rolls && g.rolls[myId]);
+  if (g.mode === 'liars' || g.mode === 'mixed') {
+    return g.phase === 'rolling'
+      && (g.order || []).includes(myId)
+      && !(g.rolled || []).includes(myId);
+  }
+  return false;
 }
 
 // 本局輸家(話胚:reveal.loserId;紅黑單雙:reveal.losers)
@@ -255,7 +277,10 @@ function renderLobby() {
   }
 
   const startLabel = startButtonLabel();
-  html += `<div class="lobby-row"><button id="start" ${state.modeId ? '' : 'disabled'}>${startLabel}</button></div>`;
+  html += `<div class="lobby-row">
+      <button id="start" ${state.modeId ? '' : 'disabled'}>${startLabel}</button>
+      <label class="auto-next"><input type="checkbox" id="autoNext" ${autoNext ? 'checked' : ''}/> 自動下一場</label>
+    </div>`;
   el.innerHTML = html;
 
   el.querySelectorAll('[data-mode]').forEach((b) =>
@@ -264,6 +289,32 @@ function renderLobby() {
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
+  $('autoNext')?.addEventListener('change', (e) => {
+    autoNext = e.target.checked;
+    localStorage.setItem('dice.autoNext', autoNext ? '1' : '0');
+    maybeAutoNext();
+  });
+}
+
+// 房主開啟「自動下一場」時:在大廳且已玩過一局 → 延遲後自動開下一場
+function maybeAutoNext() {
+  const should = state.you.isHost && autoNext && state.status === 'lobby' && state.modeId && state.game;
+  if (!should) {
+    if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; }
+    return;
+  }
+  if (autoNextTimer) return; // 已排程
+  autoNextTimer = setTimeout(async () => {
+    autoNextTimer = null;
+    if (!(state.you.isHost && autoNext && state.status === 'lobby' && state.game)) return;
+    const res = await emit('startRound', {});
+    if (res.error) { // 開不了(例:人數不足)→ 關閉自動,避免一直跳錯
+      autoNext = false;
+      localStorage.setItem('dice.autoNext', '0');
+      toast('自動下一場已關閉:' + res.error);
+      render();
+    }
+  }, 3000);
 }
 
 function startButtonLabel() {

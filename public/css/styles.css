@@ -325,6 +325,8 @@ button.danger:hover { filter: brightness(1.08); }
 .dot.on { background: #54e08a; }
 .dot.off { background: #6a7099; }
 .bid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.auto-next { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .9rem; cursor: pointer; }
+.auto-next input { cursor: pointer; }
 select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 1rem; }
 
 /* 房間內骰子縮小一點 */

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>骰盅遊戲 — 房間</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="room-wrap">
+    <header class="room-top">
+      <div class="room-code">
+        房號 <strong id="rcode">····</strong>
+        <button id="copy" class="mini">複製</button>
+      </div>
+      <div id="modeBadge" class="badge"></div>
+      <div class="top-actions">
+        <button id="forceReset" class="mini danger" style="display:none">🔄 強制重來</button>
+        <button id="leave" class="secondary mini">離開</button>
+      </div>
+    </header>
+
+    <p id="toast" class="error" role="alert"></p>
+    <section id="banner" class="banner"></section>
+    <section id="controls" class="panel"></section>
+    <section id="lobby" class="panel"></section>
+
+    <div class="room-body">
+      <main id="board"></main>
+      <aside id="roster" class="panel"></aside>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/room.js"></script>
+</body>
+</html>

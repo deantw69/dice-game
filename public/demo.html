@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>骰子動畫 Demo — Three.js vs CSS 3D</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="demo-wrap">
+    <div class="demo-head">
+      <h1>🎲 骰子動畫 Demo</h1>
+      <p class="muted">同一組點數,左右兩種實作方式並排比較。按「一起搖!」看效果,再決定正式版採用哪種。</p>
+    </div>
+
+    <div class="controls">
+      <label class="field">骰子數量
+        <input id="count" type="number" min="1" max="5" value="3" />
+      </label>
+      <button id="roll">🎲 一起搖!</button>
+    </div>
+
+    <div class="demo-grid" style="margin-top:18px;">
+      <div class="demo-card">
+        <h2>Three.js 輕量 3D</h2>
+        <div class="tag">WebGL ・ 真實光影立方體</div>
+        <div class="stage" id="stage-three"></div>
+        <p class="muted" id="result-three" style="text-align:center;margin:10px 0 0;">—</p>
+      </div>
+      <div class="demo-card">
+        <h2>CSS 3D</h2>
+        <div class="tag">純 CSS transform ・ 零函式庫依賴</div>
+        <div class="stage" id="stage-css"></div>
+        <p class="muted" id="result-css" style="text-align:center;margin:10px 0 0;">—</p>
+      </div>
+    </div>
+
+    <p class="muted" style="text-align:center;margin-top:20px;">
+      <a href="/">← 回首頁</a>
+    </p>
+  </div>
+
+  <script type="module">
+    import { createRenderer as createThree } from '/js/dice/diceThree.js';
+    import { createRenderer as createCss } from '/js/dice/diceCss3d.js';
+
+    const countInput = document.getElementById('count');
+    const rollBtn = document.getElementById('roll');
+    const resultThree = document.getElementById('result-three');
+    const resultCss = document.getElementById('result-css');
+
+    let three, css;
+
+    function build() {
+      const n = Math.max(1, Math.min(5, parseInt(countInput.value) || 1));
+      document.getElementById('stage-three').innerHTML = '';
+      document.getElementById('stage-css').innerHTML = '';
+      three = createThree(document.getElementById('stage-three'), { count: n });
+      css = createCss(document.getElementById('stage-css'), { count: n });
+    }
+
+    function randValues(n) {
+      return Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
+    }
+
+    async function roll() {
+      const n = Math.max(1, Math.min(5, parseInt(countInput.value) || 1));
+      const values = randValues(n);
+      rollBtn.disabled = true;
+      resultThree.textContent = '搖骰中…';
+      resultCss.textContent = '搖骰中…';
+      await Promise.all([three.rollTo(values), css.rollTo(values)]);
+      const txt = `結果: ${values.join(' , ')}　(總和 ${values.reduce((a,b)=>a+b,0)})`;
+      resultThree.textContent = txt;
+      resultCss.textContent = txt;
+      rollBtn.disabled = false;
+    }
+
+    countInput.addEventListener('change', build);
+    rollBtn.addEventListener('click', roll);
+    build();
+  </script>
+</body>
+</html>

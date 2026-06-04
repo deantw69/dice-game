@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>骰盅遊戲</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <main class="center">
+    <h1>🎲 骰盅遊戲</h1>
+    <p class="muted">多人線上搖骰 ・ 純搖骰 / 吹牛骰</p>
+
+    <div class="home-card">
+      <label class="block">暱稱
+        <input id="name" type="text" maxlength="12" placeholder="輸入你的暱稱" autocomplete="off" />
+      </label>
+
+      <div class="home-actions">
+        <button id="create">建立房間</button>
+      </div>
+
+      <div class="divider"><span>或</span></div>
+
+      <label class="block">房號
+        <input id="code" type="text" maxlength="4" placeholder="輸入 4 碼房號" autocomplete="off"
+               style="text-transform:uppercase;" />
+      </label>
+      <button id="join" class="secondary">加入房間</button>
+
+      <p id="err" class="error" role="alert"></p>
+    </div>
+
+    <p class="muted"><a href="/demo.html">看骰子動畫 demo →</a></p>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

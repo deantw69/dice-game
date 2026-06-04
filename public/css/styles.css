@@ -309,7 +309,7 @@ button.danger:hover { filter: brightness(1.08); }
 .dice-stage.cup-cell { min-height: 200px; align-items: stretch; perspective: none; }
 .cell-info { margin-top: 6px; }
 .waiting { color: var(--muted); font-size: .9rem; }
-.cup { width: 52px; height: 52px; border-radius: 10px; background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: #e23b3b; border: 1px solid rgba(255,255,255,0.1); }
+.cup { width: 56px; height: 56px; border-radius: 10px; background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: #e23b3b; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
 
 .center-pad { padding: 40px; text-align: center; }
 .roster { list-style: none; padding: 0; margin: 0 0 8px; }

@@ -189,7 +189,12 @@ function renderLoserBanner() {
   if (!losers.length) { el.style.display = 'none'; el.innerHTML = ''; lastLoserKey = ''; return; }
   const names = losers.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : '?'; }).join('、');
   el.style.display = '';
-  el.innerHTML = `<div class="loser-title">💀 本局輸家 💀</div><div class="loser-name">${names}</div>`;
+  // 紅黑單雙:額外寫出因為被拿掉哪一種而輸
+  const rv = state.game && state.game.reveal;
+  const reason = (rv && rv.subGame === 'redblack' && rv.conditionName)
+    ? `<div class="loser-reason">因為被拿掉「${esc(rv.conditionName)}」而輸</div>`
+    : '';
+  el.innerHTML = `<div class="loser-title">💀 本局輸家 💀</div><div class="loser-name">${names}</div>${reason}`;
   const key = losers.slice().sort().join(',');
   if (key !== lastLoserKey) { lastLoserKey = key; playFanfare(); } // 剛決出 → 播一次
 }
@@ -325,7 +330,7 @@ function maybeAutoNext() {
       toast('自動下一場已關閉:' + res.error);
       render();
     }
-  }, 3000);
+  }, 6000);
 }
 
 function startButtonLabel() {

@@ -283,6 +283,7 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-banner { text-align: center; padding: 14px 16px; margin: 6px 0; background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid #ff5d6c; border-radius: 14px; }
 .loser-banner .loser-title { font-size: 1rem; letter-spacing: 3px; color: #ffd0d6; margin-bottom: 4px; }
 .loser-banner .loser-name { font-size: 2.6rem; font-weight: 900; color: #ff5d6c; line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
+.loser-banner .loser-reason { margin-top: 6px; font-size: 1.1rem; color: #ffd0d6; }
 /* 話胚:牌型大小順序(一橫排,精簡) */
 .poker-guide { padding: 8px 12px; font-size: .85rem; color: var(--muted); }
 .poker-guide b { color: var(--accent); }

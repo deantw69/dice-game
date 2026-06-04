@@ -16,7 +16,6 @@ let state = null;            // 最新 roomState
 const myId = session.playerId;
 const diceCache = new Map(); // cellKey -> { renderer, last }
 let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
-const lockedDice = new Set(); // 話胚:我(最小者)鎖定的骰子索引,重骰時點數不變
 let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
 let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
 let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
@@ -102,19 +101,23 @@ function markRemovedDice(container, values, condition) {
   });
 }
 
-// 話胚:我是最小者時,點選自己的骰子可切換鎖定(灰框);重骰時鎖定者點數不變
-function applyLockUI(container, enabled) {
+// 話胚:鎖定骰子(灰框+鎖頭)。locked=要顯示鎖定的索引(server 廣播,所有人可見);
+// interactive=只有「輪到我重骰」時可點選切換,點選會送 setLock 給 server
+function applyLockUI(container, locked, interactive) {
+  const set = new Set(locked || []);
   const scenes = container.querySelectorAll('.die3d-scene');
   scenes.forEach((sc, i) => {
-    if (enabled) {
+    sc.classList.toggle('locked', set.has(i));
+    if (interactive) {
       sc.classList.add('lockable');
-      sc.classList.toggle('locked', lockedDice.has(i));
       sc.onclick = () => {
-        if (lockedDice.has(i)) lockedDice.delete(i); else lockedDice.add(i);
-        render(); // 重畫:更新灰框 + 重骰按鈕上的扣抵次數
+        const next = new Set(set);
+        if (next.has(i)) next.delete(i); else next.add(i);
+        sc.classList.toggle('locked', next.has(i)); // 立即視覺回饋
+        act('action', { type: 'setLock', locked: [...next] });
       };
     } else {
-      sc.classList.remove('lockable', 'locked');
+      sc.classList.remove('lockable');
       sc.onclick = null;
     }
   });
@@ -348,7 +351,6 @@ function renderBoard() {
   // 我是否為可重骰者(最小者)→ 可鎖定自己的骰子
   const iCanReroll = pokerReveal && g.phase === 'pokerCompare'
     && (g.reveal.lowestIds || []).includes(myId);
-  if (!iCanReroll) lockedDice.clear();
   // 剛輪到我(成為最小者)→ 播提示音
   if (iCanReroll && !wasLowest) playAlert();
   wasLowest = iCanReroll;
@@ -430,8 +432,12 @@ function renderBoard() {
           showDice(stage, key, hand, false, staticShow);
         }
         markRemovedDice(stage, hand, reveal.condition);     // 要被拿掉的畫叉叉
-        // 話胚:輪到我重骰時,我的骰子可點選鎖定(灰框);其餘情況清掉鎖定 UI
-        if (reveal.subGame === 'poker' && p.id === myId) applyLockUI(stage, iCanReroll);
+        // 話胚:鎖定顯示給所有人看;只有「輪到我」時我的骰子可點選切換
+        if (reveal.subGame === 'poker') {
+          const interactive = p.id === myId && iCanReroll;
+          const locks = (reveal.lockBy === p.id) ? (reveal.locked || []) : [];
+          applyLockUI(stage, locks, interactive);
+        }
       } else if (p.id === myId && g.myDice && g.myDice.length) {
         showDice(stage, 'cell-' + p.id, g.myDice);           // 自己的暗骰(2 顆以上才看得到)
       } else if (g.phase === 'rolling' && !(g.rolled || []).includes(p.id)) {
@@ -514,8 +520,9 @@ function renderControls() {
       if (low.includes(myId)) {
         const left = (g.reveal.rerolls && g.reveal.rerolls[myId]) || 0;
         const lockPaid = !!(g.reveal.lockUsed && g.reveal.lockUsed[myId]); // 本段已用過鎖定
+        const hasLock = (g.reveal.locked || []).length > 0;
         // 第一次用鎖定扣 2,之後鎖定也只扣 1
-        const cost = (lockedDice.size > 0 && !lockPaid) ? 2 : 1;
+        const cost = (hasLock && !lockPaid) ? 2 : 1;
         const canAfford = left >= cost;
         const costNote = cost > 1 ? `,本次扣 ${cost}` : '';
         el.innerHTML = '<div class="bid-row">'
@@ -523,10 +530,8 @@ function renderControls() {
           + '<button id="concede" class="secondary">🏳️ 認輸</button>'
           + '</div>';
         $('reroll')?.addEventListener('click', () => {
-          const locked = [...lockedDice];
-          const c = (locked.length > 0 && !lockPaid) ? 2 : 1;
-          if (left < c) { toast(`重骰次數不足(本次需 ${c} 次,剩 ${left})`); return; }
-          act('action', { type: 'reroll', locked });
+          if (left < cost) { toast(`重骰次數不足(本次需 ${cost} 次,剩 ${left})`); return; }
+          act('action', { type: 'reroll' });
         });
         $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
       } else {

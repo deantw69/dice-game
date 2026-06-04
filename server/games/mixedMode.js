@@ -131,7 +131,7 @@ export const mixedMode = {
         return { error: '只有牌型最小的玩家能重骰' };
       }
       // 鎖定的骰子位置保留原點數,其餘重骰;記錄實際重骰的索引供前端播動畫
-      const locked = (Array.isArray(action.locked) ? action.locked : []).filter((x) => Number.isInteger(x));
+      const locked = (round.pokerLocked || []).filter((x) => Number.isInteger(x));
       const usedLock = locked.length > 0;
       if (!round.rerolls) round.rerolls = {};
       if (!round.lockUsed) round.lockUsed = {};
@@ -162,6 +162,23 @@ export const mixedMode = {
         round.phase = 'roundEnd';
         match.over = true;
       }
+      return { ok: true };
+    }
+
+    // 話胚:最小的玩家設定鎖定哪幾顆(廣播給所有人看)
+    if (action.type === 'setLock') {
+      if (round.phase !== 'pokerCompare') return { error: '現在不能鎖定' };
+      if (!round.reveal || !round.reveal.lowestIds.includes(player.id)) {
+        return { error: '只有牌型最小的玩家能鎖定' };
+      }
+      const n = (round.hands[player.id] || []).length;
+      const locked = (Array.isArray(action.locked) ? action.locked : [])
+        .filter((x) => Number.isInteger(x) && x >= 0 && x < n);
+      round.pokerLocked = locked;
+      round.pokerLockBy = player.id;
+      // 直接更新現有 reveal,讓這次廣播就帶上鎖定狀態
+      round.reveal.locked = locked;
+      round.reveal.lockBy = player.id;
       return { ok: true };
     }
 
@@ -357,6 +374,9 @@ function resolvePoker(round, match) {
       round.lockUsed[id] = false; // 新的一段最小期間 → 鎖定罰則重置
     }
   }
+  // 鎖定狀態:最小者(集合)有變 → 清空(換人重置);續留則保留
+  const sameLowest = lowestIds.length === prevLowest.length && lowestIds.every((id) => prevLowest.includes(id));
+  if (!sameLowest) { round.pokerLocked = []; round.pokerLockBy = null; }
 
   round.condition = null;
   round.phase = 'pokerCompare';
@@ -367,6 +387,8 @@ function resolvePoker(round, match) {
     lowestIds,           // 牌型最小者(顯示外框 + 可重骰/認輸)
     rerolls: round.rerolls, // playerId -> 剩餘重骰次數
     lockUsed: round.lockUsed, // playerId -> 本段是否已用過鎖定(已付過罰則)
+    locked: round.pokerLocked || [],   // 鎖定的骰子索引(所有人可見)
+    lockBy: round.pokerLockBy || null, // 鎖定者
     loserId: (round.reveal && round.reveal.loserId) || null,
     loseBy: (round.reveal && round.reveal.loseBy) || null,
     lastRoll: null,      // 最近一次重骰 { id, idx, seq };重骰動作會覆寫

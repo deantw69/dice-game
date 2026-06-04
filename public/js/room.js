@@ -141,6 +141,16 @@ function render() {
   renderBanner();
   renderBoard();
   renderControls();
+  renderPokerGuide();
+}
+
+// 選了話胚 → 顯示牌型大小順序(一橫排,精簡)
+const POKER_RANK_HTML = '🃏 牌型大小:<b>豹子</b> › 鐵支 › 葫蘆 › 順子 › 三條 › 兩對 › 一對 › 散牌';
+function renderPokerGuide() {
+  const el = $('pokerGuide');
+  const show = !!(state.game && state.game.subGame === 'poker');
+  el.style.display = show ? '' : 'none';
+  if (show && !el.innerHTML) el.innerHTML = POKER_RANK_HTML;
 }
 
 function renderRoster() {
@@ -249,7 +259,7 @@ function renderBanner() {
   // 混合模式優先處理(階段提示 / 結算)
   if (g && g.mode === 'mixed') {
     if (state.status === 'playing' && g.phase === 'rolling') return show('🎲 搖出你的暗骰(只有你看得到)');
-    if (state.status === 'playing' && g.phase === 'choosing') return show('👇 選擇這局玩法 — <strong>任何人先按先決定!</strong>');
+    if (state.status === 'playing' && g.phase === 'choosing') return show('👇 選擇這局玩法 — <strong>上一局輸的人決定!</strong>');
     if (state.status === 'playing' && g.phase === 'bluffReady') return show('✊ 全員已搖完 — <strong>任何人可按「抓(開盅)」!</strong>');
     if (state.status === 'playing' && g.phase === 'condition') {
       if (g.openPick) return show('👇 要拿掉「紅 / 黑 / 單 / 雙」哪一種 — <strong>任何人先按先決定!</strong>');
@@ -508,7 +518,7 @@ function renderControls() {
       return;
     }
     if (g.phase === 'choosing') {
-      el.innerHTML = `<p class="muted">選擇這局玩法(任何人先按先決定):</p>`
+      el.innerHTML = `<p class="muted">選擇這局玩法(上一局輸的人決定):</p>`
         + `<div class="mode-btns">`
         + (g.subGames || []).map((s) => `<button class="chip" data-sub="${s.id}">${esc(s.name)}</button>`).join('')
         + `</div>`;

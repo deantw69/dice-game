@@ -279,6 +279,9 @@ button.danger:hover { filter: brightness(1.08); }
 .board-cell { background: var(--panel); border-radius: 12px; padding: 14px; text-align: center; }
 /* 話胚:牌型最小的玩家(可重骰/認輸)外框標記 */
 .board-cell.lowest { box-shadow: 0 0 0 3px #ff5d6c; }
+/* 話胚:牌型大小順序(一橫排,精簡) */
+.poker-guide { padding: 8px 12px; font-size: .85rem; color: var(--muted); }
+.poker-guide b { color: var(--accent); }
 /* 話胚:可點選鎖定的骰子 */
 .die3d-scene.lockable { cursor: pointer; }
 /* 被鎖定的骰子:灰色外框 + 中央鎖頭 icon(重骰時點數不變) */

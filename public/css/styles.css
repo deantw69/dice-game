@@ -40,11 +40,8 @@ h1 { margin: 0; font-size: 2.4rem; }
 .demo-head { text-align: center; margin-bottom: 16px; }
 .demo-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
-}
-@media (max-width: 760px) {
-  .demo-grid { grid-template-columns: 1fr; }
 }
 .demo-card {
   background: var(--panel);
@@ -53,7 +50,8 @@ h1 { margin: 0; font-size: 2.4rem; }
   padding: 18px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
-.demo-card h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.demo-card h2 { margin: 0 0 4px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+.demo-card h2 .num { background: var(--accent); color: #1a1300; font-weight: 800; border-radius: 8px; padding: 1px 8px; font-size: .95rem; flex-shrink: 0; }
 .demo-card .tag { font-size: .8rem; color: var(--muted); margin-bottom: 12px; }
 .stage {
   height: 280px;
@@ -153,6 +151,85 @@ input[type="number"], input[type="text"] {
 .f2 { transform: rotateX(90deg)  translateZ(40px); }
 .f5 { transform: rotateX(-90deg) translateZ(40px); }
 
+/* ===== 骰盅版渲染器 ===== */
+.cup-scene {
+  position: relative; width: 100%; height: 100%;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 28px; overflow: hidden;
+}
+/* 骰子大小由 --ds 控制(diceCup 依數量動態調整,確保塞進盅內) */
+/* 骰子排列區比骰盅窄一些,讓骰盅搖動時邊緣仍蓋得住骰子 */
+.cup-tray { --ds: 56px; display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; width: 72%; max-width: 290px; }
+/* 盅內骰子翻滾時間較短(掀蓋後露出來才看得到動) */
+.cup-tray .die3d { transition: transform 0.8s cubic-bezier(.2,.85,.25,1); }
+.cup-tray .die3d-scene, .cup-tray .die3d, .cup-tray .die3d .face { width: var(--ds); height: var(--ds); }
+.cup-tray .die3d .face { padding: calc(var(--ds) * 0.12); border-radius: calc(var(--ds) * 0.17); }
+.cup-tray .die3d .pip { width: calc(var(--ds) * 0.17); height: calc(var(--ds) * 0.17); }
+.cup-tray .f1 { transform: rotateY(0deg)   translateZ(calc(var(--ds) / 2)); }
+.cup-tray .f6 { transform: rotateY(180deg) translateZ(calc(var(--ds) / 2)); }
+.cup-tray .f3 { transform: rotateY(90deg)  translateZ(calc(var(--ds) / 2)); }
+.cup-tray .f4 { transform: rotateY(-90deg) translateZ(calc(var(--ds) / 2)); }
+.cup-tray .f2 { transform: rotateX(90deg)  translateZ(calc(var(--ds) / 2)); }
+.cup-tray .f5 { transform: rotateX(-90deg) translateZ(calc(var(--ds) / 2)); }
+
+.cup-vessel {
+  position: absolute; left: 50%; bottom: 10px;
+  transform: translateX(-50%) translateY(0);
+  width: 90%; max-width: 360px; height: 162px;
+  z-index: 3; pointer-events: none;
+  transition: transform .35s cubic-bezier(.3,.9,.3,1);
+}
+.cup-body {
+  width: 100%; height: 100%;
+  border-radius: 18px 18px 10px 10px;
+  background: linear-gradient(160deg, var(--cup1, #6a4caa), var(--cup2, #3a2a66));
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: inset 0 10px 0 rgba(255,255,255,0.12), inset 0 -16px 24px rgba(0,0,0,0.35), 0 12px 26px rgba(0,0,0,0.45);
+  position: relative; overflow: hidden;
+}
+.cup-body::before { /* 高光 */
+  content: ''; position: absolute; top: 6%; left: 12%; width: 24%; height: 74%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
+  border-radius: 45%; filter: blur(2px); transform: rotate(-8deg); pointer-events: none;
+}
+.cup-body::after { /* 盅口陰影 */
+  content: ''; position: absolute; left: 8%; bottom: -7px; width: 84%; height: 14px;
+  background: rgba(0,0,0,0.4); border-radius: 50%; filter: blur(3px);
+}
+
+/* ---- 外觀(顏色 / 形狀 / 木紋) ---- */
+.cup-style-purple { --cup1: #6a4caa; --cup2: #3a2a66; }
+.cup-style-metal  { --cup1: #d3d8e0; --cup2: #79808d; }
+.cup-style-jade   { --cup1: #43b885; --cup2: #1f6b48; }
+.cup-style-dark   { --cup1: #3a3f4a; --cup2: #12151c; }
+.cup-style-wood   { --cup1: #8a5a2b; --cup2: #4a2f1a; }
+.cup-style-wood .cup-body {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 4px, rgba(255,255,255,0.05) 4px 9px),
+    linear-gradient(160deg, var(--cup1), var(--cup2));
+}
+/* 金屬:更圓潤橢圓口 + 強高光 */
+.cup-style-metal .cup-body { border-radius: 22px 22px 14px 14px; }
+.cup-style-metal .cup-body::before { background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0)); }
+/* 翡翠:窄高瓶身 */
+.cup-style-jade .cup-vessel, .cup-vessel.cup-style-jade { }
+
+/* ---- 掀蓋方向 ---- */
+.cup-vessel.dir-up.lift    { transform: translateX(-50%) translateY(-185px); }
+.cup-vessel.dir-left.lift  { transform: translate(-205%, -110px) rotate(-32deg); }
+.cup-vessel.dir-right.lift { transform: translate(105%, -110px) rotate(32deg); }
+.cup-vessel.dir-tilt       { transform-origin: bottom right; }
+.cup-vessel.dir-tilt.lift  { transform: translateX(-50%) translateY(-70px) rotate(72deg); }
+
+.cup-vessel.shake { animation: cupShake .11s linear infinite; }
+@keyframes cupShake {
+  0%   { transform: translateX(-50%)   translateY(0)    rotate(-1.4deg); }
+  25%  { transform: translateX(-51.5%) translateY(-3px) rotate(1.4deg); }
+  50%  { transform: translateX(-48.5%) translateY(2px)  rotate(-1deg); }
+  75%  { transform: translateX(-51%)   translateY(-2px) rotate(1.4deg); }
+  100% { transform: translateX(-50%)   translateY(0)    rotate(-1.4deg); }
+}
+
 /* ===== 首頁卡片 ===== */
 .home-card {
   background: var(--panel);
@@ -197,9 +274,13 @@ button.danger:hover { filter: brightness(1.08); }
 .chip.active { background: var(--accent); color: #1a1300; border-color: var(--accent); }
 
 #board { min-height: 200px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-content: start; }
+/* 只顯示自己時(吹牛骰抓之前):格子撐滿寬度,骰子橫向鋪開 */
+#board.solo { grid-template-columns: 1fr; }
 .board-cell { background: var(--panel); border-radius: 12px; padding: 14px; text-align: center; }
 .cell-name { font-weight: 700; margin-bottom: 8px; }
 .dice-stage { min-height: 90px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; perspective: 700px; }
+/* 純搖骰的骰盅版:需要較高空間容納骰盅與掀蓋 */
+.dice-stage.cup-cell { min-height: 200px; align-items: stretch; perspective: none; }
 .cell-info { margin-top: 6px; }
 .waiting { color: var(--muted); font-size: .9rem; }
 .cup { width: 52px; height: 52px; border-radius: 10px; background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: #e23b3b; border: 1px solid rgba(255,255,255,0.1); }

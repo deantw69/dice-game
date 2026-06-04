@@ -3,44 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>骰子動畫 Demo — Three.js vs CSS 3D</title>
+  <title>骰盅動畫 Demo</title>
   <link rel="stylesheet" href="/css/styles.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-    }
-  }
-  </script>
 </head>
 <body>
   <div class="demo-wrap">
     <div class="demo-head">
       <h1>🎲 骰子動畫 Demo</h1>
-      <p class="muted">同一組點數,左右兩種實作方式並排比較。按「一起搖!」看效果,再決定正式版採用哪種。</p>
+      <p class="muted">每種樣式都有編號,按「一起搖!」同時演示同一組點數。告訴我你喜歡第幾號 👍</p>
     </div>
 
     <div class="controls">
       <label class="field">骰子數量
-        <input id="count" type="number" min="1" max="5" value="3" />
+        <input id="count" type="number" min="1" max="100" value="3" />
       </label>
       <button id="roll">🎲 一起搖!</button>
+      <label class="field"><input id="mute" type="checkbox" /> 靜音</label>
     </div>
 
-    <div class="demo-grid" style="margin-top:18px;">
-      <div class="demo-card">
-        <h2>Three.js 輕量 3D</h2>
-        <div class="tag">WebGL ・ 真實光影立方體</div>
-        <div class="stage" id="stage-three"></div>
-        <p class="muted" id="result-three" style="text-align:center;margin:10px 0 0;">—</p>
-      </div>
-      <div class="demo-card">
-        <h2>CSS 3D</h2>
-        <div class="tag">純 CSS transform ・ 零函式庫依賴</div>
-        <div class="stage" id="stage-css"></div>
-        <p class="muted" id="result-css" style="text-align:center;margin:10px 0 0;">—</p>
-      </div>
-    </div>
+    <div class="demo-grid" id="grid" style="margin-top:18px;"></div>
 
     <p class="muted" style="text-align:center;margin-top:20px;">
       <a href="/">← 回首頁</a>
@@ -48,39 +29,62 @@
   </div>
 
   <script type="module">
-    import { createRenderer as createThree } from '/js/dice/diceThree.js';
-    import { createRenderer as createCss } from '/js/dice/diceCss3d.js';
+    import { createRenderer as createCup } from '/js/dice/diceCup.js';
 
+    // 各骰盅樣式(依序編號 #1、#2 …)
+    const VARIANTS = [
+      { title: '骰盅 ・ 紫盅 / 上掀',  tag: '喀啦音效 ・ 往上掀蓋',   make: (el, n) => createCup(el, { count: n, style: 'purple', lift: 'up',    sound: true }) },
+      { title: '骰盅 ・ 木紋 / 上掀',  tag: '木紋盅 ・ 往上掀蓋',     make: (el, n) => createCup(el, { count: n, style: 'wood',   lift: 'up',    sound: true }) },
+      { title: '骰盅 ・ 金屬 / 右滑',  tag: '金屬高光 ・ 往右滑開',   make: (el, n) => createCup(el, { count: n, style: 'metal',  lift: 'right', sound: true }) },
+      { title: '骰盅 ・ 翡翠 / 傾倒',  tag: '翡翠綠 ・ 往側邊傾倒',   make: (el, n) => createCup(el, { count: n, style: 'jade',   lift: 'tilt',  sound: true }) },
+      { title: '骰盅 ・ 黑曜 / 左滑',  tag: '黑曜亮面 ・ 往左滑開',   make: (el, n) => createCup(el, { count: n, style: 'dark',   lift: 'left',  sound: true }) },
+      { title: '骰盅 ・ 木紋 / 傾倒',  tag: '木紋盅 ・ 往側邊傾倒',   make: (el, n) => createCup(el, { count: n, style: 'wood',   lift: 'tilt',  sound: true }) },
+    ];
+
+    const grid = document.getElementById('grid');
     const countInput = document.getElementById('count');
     const rollBtn = document.getElementById('roll');
-    const resultThree = document.getElementById('result-three');
-    const resultCss = document.getElementById('result-css');
+    const muteBox = document.getElementById('mute');
 
-    let three, css;
+    // 建立卡片
+    VARIANTS.forEach((v, i) => {
+      const card = document.createElement('div');
+      card.className = 'demo-card';
+      card.innerHTML = `
+        <h2><span class="num">#${i + 1}</span> ${v.title}</h2>
+        <div class="tag">${v.tag}</div>
+        <div class="stage" id="stage-${i}"></div>
+        <p class="muted result" id="result-${i}" style="text-align:center;margin:10px 0 0;">—</p>`;
+      grid.appendChild(card);
+    });
 
+    let renderers = [];
     function build() {
-      const n = Math.max(1, Math.min(5, parseInt(countInput.value) || 1));
-      document.getElementById('stage-three').innerHTML = '';
-      document.getElementById('stage-css').innerHTML = '';
-      three = createThree(document.getElementById('stage-three'), { count: n });
-      css = createCss(document.getElementById('stage-css'), { count: n });
+      const n = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
+      renderers = VARIANTS.map((v, i) => {
+        const stage = document.getElementById('stage-' + i);
+        stage.innerHTML = '';
+        return v.make(stage, n);
+      });
     }
 
-    function randValues(n) {
-      return Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
-    }
+    const randValues = (n) => Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
 
+    let rolling = false;
     async function roll() {
-      const n = Math.max(1, Math.min(5, parseInt(countInput.value) || 1));
-      const values = randValues(n);
+      if (rolling) return;
+      rolling = true;
       rollBtn.disabled = true;
-      resultThree.textContent = '搖骰中…';
-      resultCss.textContent = '搖骰中…';
-      await Promise.all([three.rollTo(values), css.rollTo(values)]);
-      const txt = `結果: ${values.join(' , ')}　(總和 ${values.reduce((a,b)=>a+b,0)})`;
-      resultThree.textContent = txt;
-      resultCss.textContent = txt;
+      const n = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
+      const values = randValues(n);
+      VARIANTS.forEach((_, i) => (document.getElementById('result-' + i).textContent = '搖骰中…'));
+      // 靜音則暫時關掉音效:用全域旗標
+      window.__cupMuted = muteBox.checked;
+      await Promise.all(renderers.map((r) => r.rollTo(values)));
+      const txt = `結果: ${values.join(' , ')}　(總和 ${values.reduce((a, b) => a + b, 0)})`;
+      VARIANTS.forEach((_, i) => (document.getElementById('result-' + i).textContent = txt));
       rollBtn.disabled = false;
+      rolling = false;
     }
 
     countInput.addEventListener('change', build);

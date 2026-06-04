@@ -31,10 +31,11 @@ export const mixedMode = {
     { id: 'redblack', name: '紅黑單雙', implemented: true },
   ],
 
-  initMatch(players) {
+  initMatch(players, startDice = START_DICE) {
+    const n = Math.max(1, Math.min(100, startDice || START_DICE));
     const diceLeft = {};
-    for (const p of players) diceLeft[p.id] = START_DICE;
-    return { diceLeft, eliminated: [] };
+    for (const p of players) diceLeft[p.id] = n;
+    return { diceLeft, eliminated: [], startDice: n };
   },
 
   startRound(match, players) {

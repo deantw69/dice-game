@@ -46,7 +46,7 @@ async function act(event, payload) {
   if (res.error) toast(res.error);
 }
 
-// 顯示骰子(快取 renderer)。staticShow=true 時直接亮點數(無翻滾動畫,用於開牌)
+// 顯示骰子(快取 renderer)。staticShow=true 直接亮點數(無翻滾動畫,用於開牌)
 function showDice(container, key, values, hidden = false, staticShow = false) {
   if (hidden) {
     container.innerHTML = values.map(() => '<div class="cup">?</div>').join('');
@@ -183,8 +183,9 @@ function renderLobby() {
   }
   html += '</div></div>';
 
-  if (state.modeId === 'roll') {
-    html += `<div class="lobby-row"><span class="label">每人骰子數</span>
+  if (state.modeId === 'roll' || state.modeId === 'liars') {
+    const label = state.modeId === 'liars' ? '每人起始骰子數' : '每人骰子數';
+    html += `<div class="lobby-row"><span class="label">${label}</span>
       <input id="diceCount" type="number" min="1" max="100" value="${state.diceCount}" /></div>`;
   }
 
@@ -243,21 +244,18 @@ function renderBanner() {
     el.style.display = '';
     return;
   }
-  if (g && g.mode === 'liars' && state.status === 'playing') {
-    if (g.currentPlayerId) {
-      const cur = state.players.find((p) => p.id === g.currentPlayerId);
-      const mine = g.currentPlayerId === myId;
-      el.innerHTML = mine ? '👉 輪到你了!' : `輪到 <strong>${esc(cur ? cur.name : '')}</strong>`;
-      el.style.display = '';
-      return;
+  if (g && g.mode === 'liars') {
+    if (state.status === 'playing' && g.phase === 'rolling') {
+      const done = (g.rolled || []).length;
+      const total = (g.order || []).length;
+      if (total > 0 && done === total) return show('✊ 全員已搖完 — 任何人可按「抓(開盅)」!');
+      return show(`🎲 各自搖骰中(<strong>${done}/${total}</strong> 已搖完),全員搖完才能抓`);
     }
-  }
-  if (g && g.mode === 'liars' && g.reveal) {
-    const r = g.reveal;
-    el.innerHTML = `開盅!喊「${r.bid.quantity} 個 ${r.bid.face}」,實際 <strong>${r.actual}</strong> 個 ・ `
-      + `${esc(r.loserName)} 失去 1 顆${r.eliminated ? '(出局)' : ''}`;
-    el.style.display = '';
-    return;
+    if (g.reveal) {
+      const s = g.reveal.stats || {};
+      const parts = [1, 2, 3, 4, 5, 6].map((f) => `${f}=${s[f] || 0}`).join('　');
+      return show(`✊ 開盅!各點數統計 — <strong>${parts}</strong>`);
+    }
   }
   el.style.display = 'none';
   el.innerHTML = '';
@@ -269,7 +267,11 @@ function renderBoard() {
   if (!g) { board.innerHTML = '<p class="muted center-pad">選擇模式後開始遊戲 🎲</p>'; return; }
 
   // 確保每位玩家一個 cell(保留 dice DOM 以利動畫);自己排第一個
-  const ordered = orderedPlayers();
+  let ordered = orderedPlayers();
+  // 吹牛骰「抓(開盅)」之前:完全只顯示自己,其他人不呈現
+  const soloView = g.mode === 'liars' && !g.reveal;
+  if (soloView) ordered = ordered.filter((p) => p.id === myId);
+  board.classList.toggle('solo', soloView); // 單人視圖時格子撐滿寬度
   const wanted = ordered.map((p) => p.id);
   // 移除多餘 cell
   [...board.children].forEach((c) => { if (!wanted.includes(c.dataset.pid)) { board.removeChild(c); diceCache.delete('cell-' + c.dataset.pid); } });
@@ -301,13 +303,18 @@ function renderBoard() {
       }
     } else if (g.mode === 'liars') {
       const reveal = g.reveal;
-      if (reveal && reveal.hands[p.id]) {
-        showDice(stage, 'cell-' + p.id, reveal.hands[p.id]); // 開盅公開
-      } else if (p.id === myId && g.myDice && g.myDice.length) {
-        showDice(stage, 'cell-' + p.id, g.myDice);           // 自己的暗骰
+      if (reveal) {
+        if (reveal.hands[p.id]) {
+          showDice(stage, 'cell-' + p.id, reveal.hands[p.id], false, true); // 開盅:靜態亮點數(無動畫)
+        } else {
+          stage.innerHTML = '<div class="waiting">未搖骰</div>';
+          diceCache.delete('cell-' + p.id);
+        }
+      } else if (g.myDice && g.myDice.length) {
+        showDice(stage, 'cell-' + p.id, g.myDice);           // 抓之前:只顯示自己的
       } else {
-        const n = g.diceLeft ? (g.diceLeft[p.id] ?? 0) : 0;
-        showDice(stage, 'cell-' + p.id, Array(n).fill(0), true); // 他人蓋著的骰盅
+        stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
+        diceCache.delete('cell-' + p.id);
       }
       info.textContent = '';
     } else if (g.mode === 'mixed') {
@@ -362,23 +369,17 @@ function renderControls() {
     return;
   }
 
-  if (g.mode === 'liars' && state.status === 'playing' && g.currentPlayerId === myId) {
-    const bid = g.currentBid;
-    const minQ = bid ? bid.quantity : 1;
-    el.innerHTML = `
-      <div class="bid-row">
-        <label class="field">數量 <input id="bidQ" type="number" min="${minQ}" value="${minQ}" /></label>
-        <label class="field">點數
-          <select id="bidF">${[1,2,3,4,5,6].map((f) => `<option value="${f}">${f}</option>`).join('')}</select>
-        </label>
-        <button id="bid">喊牌</button>
-        ${bid ? '<button id="challenge" class="secondary">開盅質疑!</button>' : ''}
-      </div>
-      ${bid ? `<p class="muted">目前喊牌:${bid.quantity} 個 ${bid.face}</p>` : '<p class="muted">你先喊(任意數量/點數)</p>'}`;
-    $('bid')?.addEventListener('click', () =>
-      act('action', { type: 'bid', quantity: $('bidQ').value, face: $('bidF').value })
-    );
-    $('challenge')?.addEventListener('click', () => act('action', { type: 'challenge' }));
+  if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'rolling') {
+    const rolled = (g.rolled || []).includes(myId);
+    const allRolled = (g.order || []).length > 0 && (g.rolled || []).length === g.order.length;
+    el.innerHTML = '<div class="bid-row">'
+      + (rolled
+        ? `<span class="muted">${allRolled ? '全員已搖完' : '已搖骰,等待其他人…'}</span>`
+        : '<button id="roll">🎲 搖骰!</button>')
+      + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
+      + '</div>';
+    $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
+    $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
     return;
   }
 

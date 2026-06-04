@@ -15,6 +15,8 @@ export function setMode(room, playerId, modeId) {
   room.matchOver = false;
   room.round = null;
   room.winnerId = null;
+  // 吹牛骰起始骰子數預設 5
+  if (modeId === 'liars') room.diceCount = 5;
   return { ok: true };
 }
 
@@ -47,15 +49,24 @@ export function startRound(room, playerId) {
     return { error: `此模式至少需要 ${mode.minPlayers} 人` };
   }
 
-  if (isMatchMode(mode)) {
+  if (mode.id === 'liars') {
+    // 吹牛骰每局獨立(無淘汰)→ 每次開始都用「當前設定」重新發骰,改數量即時生效
+    room.match = mode.initMatch(room.players, room.diceCount);
+    room.matchOver = false;
+    room.winnerId = null;
+    room.round = mode.startRound(room.match, room.players);
+  } else if (isMatchMode(mode)) {
+    // 混合模式:整場狀態持續(會淘汰失骰),固定從 5 顆開始
+    const startDice = mode.startDice || 5;
     if (!room.match || room.matchOver) {
-      room.match = mode.initMatch(room.players);
+      room.match = mode.initMatch(room.players, startDice);
       room.matchOver = false;
       room.winnerId = null;
     } else {
-      // 中途併入的新玩家補發骰子
+      // 中途併入的新玩家補發骰子(用本場的起始骰子數)
+      const sd = room.match.startDice ?? mode.startDice;
       for (const p of room.players) {
-        if (room.match.diceLeft[p.id] == null) room.match.diceLeft[p.id] = mode.startDice;
+        if (room.match.diceLeft[p.id] == null) room.match.diceLeft[p.id] = sd;
       }
     }
     room.round = mode.startRound(room.match, room.players);
@@ -122,15 +133,11 @@ export function onPlayerLeft(room, leftId) {
   } else if (mode.id === 'liars') {
     const r = room.round;
     if (r.order && r.order.includes(leftId)) {
-      const idx = r.order.indexOf(leftId);
-      r.order.splice(idx, 1);
+      r.order = r.order.filter((id) => id !== leftId);
+      if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
       if (r.hands) delete r.hands[leftId];
-      // 修正輪到誰
-      if (idx < r.turnIdx) r.turnIdx -= 1;
-      if (r.order.length === 0) { room.status = 'lobby'; }
-      else if (r.turnIdx >= r.order.length) { r.turnIdx = 0; }
+      if (r.order.length === 0) room.status = 'lobby';
     }
-    // 整場是否只剩一人 → 結束本場
     if (mode.isMatchOver(room.match, room.players)) {
       room.matchOver = true;
       const w = mode.winner(room.match, room.players);

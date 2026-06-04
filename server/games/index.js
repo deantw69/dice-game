@@ -11,6 +11,6 @@ export const MODES = {
 // 給前端選單用的模式清單(available:false 會在 UI 變灰且後端拒絕)
 export const MODE_LIST = [
   { id: rollMode.id, name: rollMode.name, available: true },
-  { id: liarsDice.id, name: liarsDice.name, available: false }, // 吹牛骰暫時隱藏
+  { id: liarsDice.id, name: liarsDice.name, available: true },
   { id: mixedMode.id, name: mixedMode.name, available: true },
 ];

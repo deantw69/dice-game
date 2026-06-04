@@ -266,7 +266,7 @@ const FS = { 1: 6, 6: 5, 5: 4, 4: 3, 3: 2, 2: 1 };
 
 // 評估一手骰子 → { arr, label }
 // arr[0] 為牌型大分類(越大越好),其後為同型內的比較鍵(逐項比,越大越好)
-// 牌型(高→低):五個1 > 鐵支(四條/五條) > 葫蘆 > 順子 > 三條 > 兩對 > 一對 > 散牌
+// 牌型(高→低):豹子(五同) > 鐵支(四同) > 葫蘆 > 順子 > 三條 > 兩對 > 一對 > 散牌
 function evalHand(dice) {
   const count = {};
   for (const v of dice) count[v] = (count[v] || 0) + 1;
@@ -275,13 +275,15 @@ function evalHand(dice) {
   const byRank = faces.slice().sort((a, b) => count[b] - count[a] || FS[b] - FS[a]);
   const allDesc = dice.slice().sort((a, b) => FS[b] - FS[a]).map((v) => FS[v]); // 全部點數強弱(大→小)
 
-  if (count[1] === 5) return { arr: [8], label: '五個1' };
+  // 豹子(五個同點)→ 最大;同為豹子比點數 1>6>5>4>3>2(例:五個4 → 「4豹子」)
+  const five = byRank.find((f) => count[f] === 5);
+  if (five != null) return { arr: [9, FS[five]], label: `${five}豹子` };
 
-  // 鐵支(四條;五個 2~6 也歸此類,以張數+kicker 區分)
-  const quad = byRank.find((f) => count[f] >= 4);
+  // 鐵支(四條)
+  const quad = byRank.find((f) => count[f] === 4);
   if (quad != null) {
     const kicker = byRank.find((f) => f !== quad);
-    return { arr: [7, FS[quad], count[quad], kicker != null ? FS[kicker] : FS[quad]], label: '鐵支' };
+    return { arr: [7, FS[quad], kicker != null ? FS[kicker] : 0], label: '鐵支' };
   }
 
   const triple = byRank.find((f) => count[f] === 3);

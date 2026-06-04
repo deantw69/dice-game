@@ -9,7 +9,7 @@ export const rollMode = {
   // 建立一輪的狀態
   startRound(players, opts = {}) {
     return {
-      diceCount: Math.max(1, Math.min(5, opts.diceCount || 3)),
+      diceCount: Math.max(1, Math.min(100, opts.diceCount || 3)),
       rolls: {},        // playerId -> [dice]
       phase: 'rolling', // rolling -> roundEnd
     };

@@ -20,7 +20,7 @@ export function setMode(room, playerId, modeId) {
 
 export function setDiceCount(room, playerId, n) {
   if (room.hostId !== playerId) return { error: '只有房主能設定' };
-  room.diceCount = Math.max(1, Math.min(5, parseInt(n) || 3));
+  room.diceCount = Math.max(1, Math.min(100, parseInt(n) || 3));
   return { ok: true };
 }
 

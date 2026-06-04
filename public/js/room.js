@@ -185,7 +185,7 @@ function renderLobby() {
 
   if (state.modeId === 'roll') {
     html += `<div class="lobby-row"><span class="label">每人骰子數</span>
-      <input id="diceCount" type="number" min="1" max="5" value="${state.diceCount}" /></div>`;
+      <input id="diceCount" type="number" min="1" max="100" value="${state.diceCount}" /></div>`;
   }
 
   const startLabel = startButtonLabel();

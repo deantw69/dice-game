@@ -221,6 +221,7 @@ function renderBanner() {
   if (g && g.mode === 'mixed') {
     if (state.status === 'playing' && g.phase === 'rolling') return show('🎲 搖出你的暗骰(只有你看得到)');
     if (state.status === 'playing' && g.phase === 'choosing') return show('👇 選擇這局玩法 — <strong>任何人先按先決定!</strong>');
+    if (state.status === 'playing' && g.phase === 'bluffReady') return show('✊ 全員已搖完 — <strong>任何人可按「抓(開盅)」!</strong>');
     if (state.status === 'playing' && g.phase === 'condition') {
       if (g.openPick) return show('👇 要拿掉「紅 / 黑 / 單 / 雙」哪一種 — <strong>任何人先按先決定!</strong>');
       return show(g.chooserId === myId
@@ -229,6 +230,11 @@ function renderBanner() {
     }
     if (g.reveal && !g.reveal.pending) {
       const r = g.reveal;
+      if (r.subGame === 'bluff') {
+        const s = r.stats || {};
+        const parts = [1, 2, 3, 4, 5, 6].map((f) => `${f}=${s[f] || 0}`).join('　');
+        return show(`✊ 開盅!各點數統計 — <strong>${parts}</strong> ・ 房主可按「再來一場」`);
+      }
       let msg = `<strong>${nm(g.chooserId)}</strong> 選「<strong>${esc(r.conditionName)}的拿掉</strong>」,開牌!`;
       if (r.losers && r.losers.length) msg += ` ・ 💀 ${r.losers.map(nm).join('、')} 失去所有骰子,輸了!`;
       else if (state.winnerId) msg += ` ・ 🏆 ${nm(state.winnerId)} 獲勝!`;
@@ -391,6 +397,14 @@ function renderControls() {
         ? '<p class="muted">已搖骰,等待其他人…</p>'
         : `<button id="roll">${label}</button>`;
       $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
+      return;
+    }
+    if (g.phase === 'bluffReady') {
+      const allRolled = (g.order || []).length > 0 && (g.rolled || []).length === g.order.length;
+      el.innerHTML = '<div class="bid-row"><span class="muted">全員已搖完</span>'
+        + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
+        + '</div>';
+      $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
       return;
     }
     if (g.phase === 'choosing') {

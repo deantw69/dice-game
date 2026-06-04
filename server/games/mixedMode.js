@@ -29,6 +29,7 @@ export const mixedMode = {
   // 可選子玩法清單(逐步擴充)
   subGames: [
     { id: 'redblack', name: '紅黑單雙', implemented: true },
+    { id: 'bluff', name: '吹牛', implemented: true },
   ],
 
   initMatch(players, startDice = START_DICE) {
@@ -91,10 +92,27 @@ export const mixedMode = {
       const sg = this.subGames.find((s) => s.id === action.subGame);
       if (!sg) return { error: '未知的玩法' };
       round.subGame = sg.id;
+      if (sg.id === 'bluff') {
+        // 吹牛:不選條件,全員已搖完 → 直接進入可開盅狀態(任何人可抓)
+        round.phase = 'bluffReady';
+        round.openPick = true;
+        round.chooserId = null;
+        return { ok: true, chosen: sg.id };
+      }
       round.chooserId = player.id; // 第一次條件由選玩法的人決定
       round.openPick = false;
       round.phase = 'condition';
       return { ok: true, chosen: sg.id };
+    }
+
+    // 吹牛:抓(開盅)→ 公開所有人骰子 + 各點數統計,開盅即結束本場
+    if (action.type === 'grab') {
+      if (round.phase !== 'bluffReady') return { error: '現在不能開盅' };
+      if (!round.order.every((id) => round.rolled.includes(id))) {
+        return { error: '還有人沒搖骰' };
+      }
+      resolveBluff(round, match);
+      return { ok: true, revealed: true };
     }
 
     // 選條件 → 開牌結算
@@ -120,6 +138,7 @@ export const mixedMode = {
 
   // 任一玩家失去所有骰子 → 本場結束;或場上只剩 ≤1 人
   isMatchOver(match, players) {
+    if (match.bluffOver) return true; // 吹牛開盅即結束本場
     const counts = players.map((p) => match.diceLeft[p.id] ?? 0);
     if (counts.some((c) => c === 0)) return true;
     return counts.filter((c) => c > 0).length <= 1;
@@ -153,6 +172,25 @@ export const mixedMode = {
     return { myDice: blind ? [] : hand, blind };
   },
 };
+
+// 吹牛開盅:統計各點數數量,公開所有骰子;開盅即本場結束 → 回大廳「再來一場」
+function resolveBluff(round, match) {
+  const stats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  for (const id of round.order) {
+    for (const d of round.hands[id] || []) stats[d] = (stats[d] || 0) + 1;
+  }
+  round.condition = null;
+  round.phase = 'roundEnd';  // 結束本場(不像紅黑會繼續搖下一骰)
+  match.bluffOver = true;    // 讓 isMatchOver 判定本場已結束
+  round.reveal = {
+    subGame: 'bluff',
+    stats,
+    hands: round.hands, // 開盅:公開所有骰子
+    removed: {},        // 吹牛不拿骰、不淘汰
+    losers: [],
+    pending: false,
+  };
+}
 
 function resolveRedBlack(round, match, condId, cond) {
   const removed = {};

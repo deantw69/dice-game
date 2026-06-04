@@ -356,10 +356,10 @@ function renderBanner() {
     }
     if (state.status === 'playing' && g.phase === 'bluffReady') return show('✊ 全員已搖完 — <strong>任何人可按「抓(開盅)」!</strong>');
     if (state.status === 'playing' && g.phase === 'condition') {
-      if (g.openPick) return show('👇 要拿掉「紅 / 黑 / 單 / 雙」哪一種 — <strong>任何人先按先決定!</strong>');
+      if (g.openPick) return show('👇 要拿掉「紅 / 黑 / 單 / 雙 / 大 / 小」哪一種 — <strong>任何人先按先決定!</strong>');
       return show(g.chooserId === myId
-        ? '👉 換你決定:要拿掉「紅 / 黑 / 單 / 雙」哪一種?'
-        : `等待 <strong>${nm(g.chooserId)}</strong> 決定要拿掉哪一種…`);
+        ? '👉 換你決定:要拿掉「紅 / 黑 / 單 / 雙 / 大 / 小」哪一種?'
+        : `等待 <span class="hl">${nm(g.chooserId)}</span> 決定要拿掉哪一種…`);
     }
     if (g.reveal && !g.reveal.pending) {
       const r = g.reveal;
@@ -646,7 +646,7 @@ function renderControls() {
         );
       } else {
         const ch = state.players.find((p) => p.id === g.chooserId);
-        el.innerHTML = `<p class="muted">等待 ${esc(ch ? ch.name : '')} 決定要拿掉哪一種…</p>`;
+        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(ch ? ch.name : '')}</span> 決定要拿掉哪一種…</p>`;
       }
       return;
     }

@@ -70,6 +70,7 @@ export function startRound(room, playerId) {
       }
     }
     room.round = mode.startRound(room.match, room.players);
+    if (mode.id === 'mixed') room.round.decider = computeDecider(room); // 由輸家決定玩法
   } else if (mode.id === 'roll') {
     room.round = mode.startRound(room.players, { diceCount: room.diceCount });
     room.match = null;
@@ -120,18 +121,31 @@ function isMatchMode(mode) {
   return mode && typeof mode.initMatch === 'function';
 }
 
-// 累計各玩家「輸的次數」:話胚 reveal.loserId、紅黑單雙 reveal.losers;每場僅計一次
+// 累計各玩家「輸的次數」+ 記錄本場輸家(供「由輸家決定」);每場僅計一次
 function recordLosses(room) {
   if (!room.match || room.match.lossCounted) return;
-  const rv = room.round && room.round.reveal;
-  if (!rv) return;
-  const losers = [];
-  if (rv.loserId) losers.push(rv.loserId);
-  if (Array.isArray(rv.losers)) losers.push(...rv.losers);
-  if (losers.length === 0) return;
-  if (!room.losses) room.losses = {};
-  for (const id of new Set(losers)) room.losses[id] = (room.losses[id] || 0) + 1;
   room.match.lossCounted = true;
+  const rv = room.round && room.round.reveal;
+  const losers = [];
+  if (rv) {
+    if (rv.loserId) losers.push(rv.loserId);
+    if (Array.isArray(rv.losers)) losers.push(...rv.losers);
+  }
+  const uniq = [...new Set(losers)];
+  room.lastLosers = uniq; // 上一場輸家(可能為空,如吹牛)
+  if (!room.losses) room.losses = {};
+  for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
+}
+
+// 「由輸家決定」:取上一場輸家中,玩家列表順位最上(且仍在場)者
+function computeDecider(room) {
+  if (!room.loserDecides) return null;
+  const losers = room.lastLosers || [];
+  if (!losers.length) return null; // 首場或無輸家 → 不限制
+  for (const p of room.players) {
+    if (losers.includes(p.id)) return p.id; // room.players 即加入順位,上面優先
+  }
+  return null;
 }
 
 // 玩家離開房間後,重新判定進行中的回合是否該結束(避免卡在等待離開者)

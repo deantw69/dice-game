@@ -91,6 +91,10 @@ export const mixedMode = {
     // 選玩法:任何人先按先決定(整場只在開頭一次)→ 由他選第一次條件
     if (action.type === 'chooseSubGame') {
       if (round.phase !== 'choosing') return { error: '現在不能選玩法' };
+      // 「由輸家決定」:只有指定決定者能選(決定者已離場則不限制)
+      if (round.decider && round.order.includes(round.decider) && player.id !== round.decider) {
+        return { error: '本局由上一局輸家決定玩法' };
+      }
       const sg = this.subGames.find((s) => s.id === action.subGame);
       if (!sg) return { error: '未知的玩法' };
       round.subGame = sg.id;
@@ -241,6 +245,8 @@ export const mixedMode = {
       condition: round.condition,
       openPick: round.openPick,
       subGames: this.subGames,
+      // 由輸家決定:指定決定者(已離場則視為不限制)
+      decider: (round.decider && round.order.includes(round.decider)) ? round.decider : null,
       reveal: round.reveal,
     };
   },

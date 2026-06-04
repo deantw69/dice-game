@@ -275,6 +275,10 @@ function renderLobby() {
     html += `<div class="lobby-row"><span class="label">${label}</span>
       <input id="diceCount" type="number" min="1" max="100" value="${state.diceCount}" /></div>`;
   }
+  if (state.modeId === 'mixed') {
+    html += `<div class="lobby-row"><label class="auto-next">
+      <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label></div>`;
+  }
 
   const startLabel = startButtonLabel();
   html += `<div class="lobby-row">
@@ -288,6 +292,7 @@ function renderLobby() {
   );
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
+  $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
   $('autoNext')?.addEventListener('change', (e) => {
     autoNext = e.target.checked;
@@ -336,7 +341,10 @@ function renderBanner() {
   // 混合模式優先處理(階段提示 / 結算)
   if (g && g.mode === 'mixed') {
     if (state.status === 'playing' && g.phase === 'rolling') return show('🎲 搖出你的暗骰(只有你看得到)');
-    if (state.status === 'playing' && g.phase === 'choosing') return show('👇 選擇這局玩法 — <strong>上一局輸的人決定!</strong>');
+    if (state.status === 'playing' && g.phase === 'choosing') {
+      if (g.decider && g.decider !== myId) return show(`⏳ 等待由 <strong>${nm(g.decider)}</strong> 決定玩法…`);
+      return show(g.decider ? '👇 選擇這局玩法 — <strong>由你決定!</strong>' : '👇 選擇這局玩法 — <strong>任何人先按先決定!</strong>');
+    }
     if (state.status === 'playing' && g.phase === 'bluffReady') return show('✊ 全員已搖完 — <strong>任何人可按「抓(開盅)」!</strong>');
     if (state.status === 'playing' && g.phase === 'condition') {
       if (g.openPick) return show('👇 要拿掉「紅 / 黑 / 單 / 雙」哪一種 — <strong>任何人先按先決定!</strong>');
@@ -600,7 +608,14 @@ function renderControls() {
       return;
     }
     if (g.phase === 'choosing') {
-      el.innerHTML = `<p class="muted">選擇這局玩法(上一局輸的人決定):</p>`
+      // 由輸家決定:不是指定的人 → 只顯示等待
+      if (g.decider && g.decider !== myId) {
+        const d = state.players.find((p) => p.id === g.decider);
+        el.innerHTML = `<p class="muted">正在等待由 <strong>${esc(d ? d.name : '')}</strong> 決定玩法…</p>`;
+        return;
+      }
+      const hint = g.decider ? '(由你決定)' : '(任何人先按先決定)';
+      el.innerHTML = `<p class="muted">選擇這局玩法${hint}:</p>`
         + `<div class="mode-btns">`
         + (g.subGames || []).map((s) => `<button class="chip" data-sub="${s.id}">${esc(s.name)}</button>`).join('')
         + `</div>`;

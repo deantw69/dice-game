@@ -123,6 +123,15 @@ export function removePlayer(room, playerId) {
   }
 }
 
+// 隨機打亂玩家順序(Fisher-Yates)
+export function shufflePlayers(room) {
+  const a = room.players;
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+}
+
 // 把觀戰者併入正式玩家(於開始新一輪時呼叫)
 export function mergeSpectators(room) {
   if (room.spectators.length === 0) return;

@@ -282,6 +282,8 @@ function renderLobby() {
       <input type="checkbox" id="autoRotate" ${state.autoRotate ? 'checked' : ''}/> 自動順位(紅黑單雙)</label></div>`;
   }
 
+  html += `<div class="lobby-row"><button id="shuffle" class="secondary">🔀 打亂玩家順序</button></div>`;
+
   const startLabel = startButtonLabel();
   html += `<div class="lobby-row">
       <button id="start" ${state.modeId ? '' : 'disabled'}>${startLabel}</button>
@@ -297,6 +299,7 @@ function renderLobby() {
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
+  $('shuffle')?.addEventListener('click', () => act('shufflePlayers', {}));
   $('autoNext')?.addEventListener('change', (e) => {
     autoNext = e.target.checked;
     localStorage.setItem('dice.autoNext', autoNext ? '1' : '0');
@@ -670,4 +673,17 @@ $('leave').addEventListener('click', async () => {
 });
 $('forceReset').addEventListener('click', () => {
   if (confirm('確定強制重來?目前這場將中止,回到大廳重新開始。')) act('forceReset', {});
+});
+
+// 電腦瀏覽器:在「搖骰」環節按空白鍵也能骰(等同點目前的搖骰按鈕)
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if (e.code !== 'Space' && e.key !== ' ') return;
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+  const btn = document.getElementById('roll'); // 各模式的搖骰/搖下一骰按鈕
+  if (btn && !btn.disabled) {
+    e.preventDefault();
+    btn.click();
+  }
 });

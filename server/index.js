@@ -90,6 +90,16 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  socket.on('setAutoRotate', ({ on }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
+    room.autoRotate = !!on;
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   socket.on('startRound', (_payload, cb) => {
     const room = rm.findRoomBySocket(socket.id);
     if (!room) return cb?.({ error: '尚未加入房間' });

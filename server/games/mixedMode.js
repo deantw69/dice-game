@@ -76,8 +76,14 @@ export const mixedMode = {
       round.hands[player.id] = rollDice(match.diceLeft[player.id]);
       round.rolled.push(player.id);
       if (round.order.every((id) => round.rolled.includes(id))) {
-        if (round.subGame) {
-          // 第二骰起:直接選條件,且開放任何人先按先決定
+        if (round.subGame === 'redblack' && round.autoRotate) {
+          // 自動順位:由玩家列表順序的「下一位」決定要拿掉哪一種
+          const i = round.order.indexOf(round.chooserId);
+          round.chooserId = round.order[(i + 1) % round.order.length];
+          round.openPick = false;
+          round.phase = 'condition';
+        } else if (round.subGame) {
+          // 未開自動順位:任何人先按先決定
           round.phase = 'condition';
           round.openPick = true;
           round.chooserId = null;
@@ -202,9 +208,9 @@ export const mixedMode = {
     // 選條件 → 開牌結算
     if (action.type === 'chooseCondition') {
       if (round.phase !== 'condition') return { error: '現在不能選條件' };
-      // 第一次:只有選玩法的人能決定;第二骰起:任何人先按先決定
+      // 第一骰由選玩法的人;之後輪到玩家列表順序的下一位(openPick 時才任何人可)
       if (!round.openPick && player.id !== round.chooserId) {
-        return { error: '只有選玩法的人能決定' };
+        return { error: '還沒輪到你決定' };
       }
       const cond = CONDITIONS[action.condition];
       if (!cond) return { error: '未知的條件' };

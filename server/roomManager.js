@@ -44,6 +44,7 @@ export function createRoom(name, socketId) {
     losses: {},          // playerId -> 累計輸的次數
     lastLosers: [],      // 上一場的輸家(供「由輸家決定」用)
     loserDecides: false, // 混合模式:由上一局輸家決定玩法(房主開關)
+    autoRotate: false,   // 紅黑單雙:之後每骰由列表順位下一位決定條件(房主開關)
   };
   rooms.set(code, room);
   return { room, player: host };
@@ -144,6 +145,7 @@ export function viewFor(room, viewerId) {
     winnerId: room.winnerId,
     losses: room.losses || {},
     loserDecides: !!room.loserDecides,
+    autoRotate: !!room.autoRotate,
     modes: MODE_LIST,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

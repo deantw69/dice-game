@@ -70,7 +70,10 @@ export function startRound(room, playerId) {
       }
     }
     room.round = mode.startRound(room.match, room.players);
-    if (mode.id === 'mixed') room.round.decider = computeDecider(room); // 由輸家決定玩法
+    if (mode.id === 'mixed') {
+      room.round.decider = computeDecider(room); // 由輸家決定玩法
+      room.round.autoRotate = !!room.autoRotate; // 自動順位(紅黑單雙條件輪流)
+    }
   } else if (mode.id === 'roll') {
     room.round = mode.startRound(room.players, { diceCount: room.diceCount });
     room.match = null;

@@ -277,7 +277,9 @@ function renderLobby() {
   }
   if (state.modeId === 'mixed') {
     html += `<div class="lobby-row"><label class="auto-next">
-      <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label></div>`;
+      <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label>
+      <label class="auto-next">
+      <input type="checkbox" id="autoRotate" ${state.autoRotate ? 'checked' : ''}/> 自動順位(紅黑單雙)</label></div>`;
   }
 
   const startLabel = startButtonLabel();
@@ -293,6 +295,7 @@ function renderLobby() {
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
+  $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
   $('autoNext')?.addEventListener('change', (e) => {
     autoNext = e.target.checked;

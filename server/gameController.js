@@ -106,6 +106,7 @@ export function handleAction(room, player, action) {
         room.matchOver = true;
         const w = mode.winner(room.match, room.players);
         room.winnerId = w ? w.id : null;
+        recordLosses(room); // 累計輸的次數(每場僅一次)
       }
       room.status = 'lobby'; // 等房主開下一輪 / 或整場已結束
     }
@@ -117,6 +118,20 @@ export function handleAction(room, player, action) {
 // 具備整場狀態(initMatch)的模式 → 吹牛骰 / 混合模式
 function isMatchMode(mode) {
   return mode && typeof mode.initMatch === 'function';
+}
+
+// 累計各玩家「輸的次數」:話胚 reveal.loserId、紅黑單雙 reveal.losers;每場僅計一次
+function recordLosses(room) {
+  if (!room.match || room.match.lossCounted) return;
+  const rv = room.round && room.round.reveal;
+  if (!rv) return;
+  const losers = [];
+  if (rv.loserId) losers.push(rv.loserId);
+  if (Array.isArray(rv.losers)) losers.push(...rv.losers);
+  if (losers.length === 0) return;
+  if (!room.losses) room.losses = {};
+  for (const id of new Set(losers)) room.losses[id] = (room.losses[id] || 0) + 1;
+  room.match.lossCounted = true;
 }
 
 // 玩家離開房間後,重新判定進行中的回合是否該結束(避免卡在等待離開者)

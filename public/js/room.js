@@ -197,11 +197,8 @@ function renderRoster() {
   let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
   // 玩家列表固定用加入順序(state.players 原始順序:房主先、之後依加入先後)
   html += state.players.map((p) => {
-    let extra = '';
-    if (state.game && (state.game.mode === 'liars' || state.game.mode === 'mixed') && state.game.diceLeft) {
-      const n = state.game.diceLeft[p.id] ?? 0;
-      extra = n > 0 ? ` <span class="muted">🎲×${n}</span>` : ' <span class="muted">出局</span>';
-    }
+    const losses = (state.losses && state.losses[p.id]) || 0;
+    const extra = ` <span class="muted">輸 ${losses} 次</span>`;
     return playerRow(p, extra);
   }).join('');
   html += '</ul>';

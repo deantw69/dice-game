@@ -41,6 +41,7 @@ export function createRoom(name, socketId) {
     matchOver: false,
     round: null,         // 當前一輪
     winnerId: null,
+    losses: {},          // playerId -> 累計輸的次數
   };
   rooms.set(code, room);
   return { room, player: host };
@@ -139,6 +140,7 @@ export function viewFor(room, viewerId) {
     status: room.status,
     matchOver: room.matchOver,
     winnerId: room.winnerId,
+    losses: room.losses || {},
     modes: MODE_LIST,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

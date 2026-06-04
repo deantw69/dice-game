@@ -1,0 +1,14 @@
+# Render Blueprint — 一鍵部署設定
+# 在 Render 上選 New → Blueprint,連到此 repo 即可依此設定建立服務。
+services:
+  - type: web
+    name: dice-game
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

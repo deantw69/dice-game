@@ -1,6 +1,7 @@
 // 房間 UI 與 socket 事件繫結
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
+import { playAlert, playFanfare } from './dice/cupSound.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -17,6 +18,8 @@ const diceCache = new Map(); // cellKey -> { renderer, last }
 let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
 const lockedDice = new Set(); // 話胚:我(最小者)鎖定的骰子索引,重骰時點數不變
 let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
+let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
+let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
 
 // ---- 連線 / 重連 ----
 async function doRejoin() {
@@ -142,6 +145,28 @@ function render() {
   renderBoard();
   renderControls();
   renderPokerGuide();
+  renderLoserBanner();
+}
+
+// 本局輸家(話胚:reveal.loserId;紅黑單雙:reveal.losers)
+function currentLosers() {
+  const g = state.game;
+  if (!g || !g.reveal) return [];
+  if (g.reveal.subGame === 'poker' && g.reveal.loserId) return [g.reveal.loserId];
+  if (g.reveal.subGame === 'redblack' && (g.reveal.losers || []).length) return g.reveal.losers;
+  return [];
+}
+
+// 決出輸家 → 獨立大字公告 + 嘲諷音效(放上方,不蓋住房主的「再來一場」)
+function renderLoserBanner() {
+  const el = $('loserBanner');
+  const losers = currentLosers();
+  if (!losers.length) { el.style.display = 'none'; el.innerHTML = ''; lastLoserKey = ''; return; }
+  const names = losers.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : '?'; }).join('、');
+  el.style.display = '';
+  el.innerHTML = `<div class="loser-title">💀 本局輸家 💀</div><div class="loser-name">${names}</div>`;
+  const key = losers.slice().sort().join(',');
+  if (key !== lastLoserKey) { lastLoserKey = key; playFanfare(); } // 剛決出 → 播一次
 }
 
 // 選了話胚 → 顯示牌型大小順序(一橫排,精簡)
@@ -170,7 +195,8 @@ function renderRoster() {
     return `<li>${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
   };
   let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
-  html += orderedPlayers().map((p) => {
+  // 玩家列表固定用加入順序(state.players 原始順序:房主先、之後依加入先後)
+  html += state.players.map((p) => {
     let extra = '';
     if (state.game && (state.game.mode === 'liars' || state.game.mode === 'mixed') && state.game.diceLeft) {
       const n = state.game.diceLeft[p.id] ?? 0;
@@ -326,6 +352,9 @@ function renderBoard() {
   const iCanReroll = pokerReveal && g.phase === 'pokerCompare'
     && (g.reveal.lowestIds || []).includes(myId);
   if (!iCanReroll) lockedDice.clear();
+  // 剛輪到我(成為最小者)→ 播提示音
+  if (iCanReroll && !wasLowest) playAlert();
+  wasLowest = iCanReroll;
   // 本次 render 是否有「新的重骰」要播放動畫(由 server 帶來:誰、重骰了哪些索引)
   const lastRoll = pokerReveal ? g.reveal.lastRoll : null;
   const isNewRoll = !!(lastRoll && lastRoll.seq !== lastRollSeq);

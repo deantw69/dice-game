@@ -14,6 +14,9 @@ if (!session || !session.playerId || session.code !== code) {
 let state = null;            // 最新 roomState
 const myId = session.playerId;
 const diceCache = new Map(); // cellKey -> { renderer, last }
+let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
+const lockedDice = new Set(); // 話胚:我(最小者)鎖定的骰子索引,重骰時點數不變
+let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
 
 // ---- 連線 / 重連 ----
 async function doRejoin() {
@@ -47,7 +50,8 @@ async function act(event, payload) {
 }
 
 // 顯示骰子(快取 renderer)。staticShow=true 直接亮點數(無翻滾動畫,用於開牌)
-function showDice(container, key, values, hidden = false, staticShow = false) {
+// rollIdx:明確指定要滾動的骰子索引 → 強制滾動(即使點數與上次相同,例如重骰剛好同點)
+function showDice(container, key, values, hidden = false, staticShow = false, rollIdx = undefined) {
   if (hidden) {
     container.innerHTML = values.map(() => '<div class="cup">?</div>').join('');
     diceCache.delete(key);
@@ -60,8 +64,13 @@ function showDice(container, key, values, hidden = false, staticShow = false) {
     entry = { renderer, el: container, count: values.length, last: null };
     diceCache.set(key, entry);
   }
-  const sig = (staticShow ? 's:' : 'a:') + values.join(',');
-  if (entry.last !== sig) {
+  const sig = values.join(',');
+  if (!staticShow && rollIdx !== undefined) {
+    // 強制滾動指定骰子(由重骰事件驅動,不受「點數沒變」影響)
+    entry.renderer.rollTo(values, rollIdx);
+    entry.last = sig;
+  } else if (entry.last !== sig) {
+    // 一般情形:以「點數」為簽章,點數有變才更新(靜態↔動畫切換但點數沒變時不誤觸發)
     if (staticShow) entry.renderer.setStatic(values);
     else entry.renderer.rollTo(values);
     entry.last = sig;
@@ -87,6 +96,24 @@ function markRemovedDice(container, values, condition) {
   scenes.forEach((sc, i) => {
     if (fn && fn(values[i])) sc.classList.add('marked');
     else sc.classList.remove('marked');
+  });
+}
+
+// 話胚:我是最小者時,點選自己的骰子可切換鎖定(灰框);重骰時鎖定者點數不變
+function applyLockUI(container, enabled) {
+  const scenes = container.querySelectorAll('.die3d-scene');
+  scenes.forEach((sc, i) => {
+    if (enabled) {
+      sc.classList.add('lockable');
+      sc.classList.toggle('locked', lockedDice.has(i));
+      sc.onclick = () => {
+        if (lockedDice.has(i)) lockedDice.delete(i); else lockedDice.add(i);
+        render(); // 重畫:更新灰框 + 重骰按鈕上的扣抵次數
+      };
+    } else {
+      sc.classList.remove('lockable', 'locked');
+      sc.onclick = null;
+    }
   });
 }
 
@@ -119,16 +146,18 @@ function render() {
 function renderRoster() {
   const el = $('roster');
   const playerRow = (p, extra = '') => {
-    const crown = p.id === state.hostId ? '👑 ' : '';
+    const isHost = p.id === state.hostId;
     const me = p.id === myId ? ' (你)' : '';
     const dot = p.connected ? 'on' : 'off';
+    // 房主用皇冠取代綠點(不重複);其他玩家顯示連線狀態圓點
+    const lead = isHost ? '<span class="crown">👑</span>' : `<span class="dot ${dot}"></span>`;
     const actions = (state.you.isHost && p.id !== myId)
       ? `<span class="row-actions">`
         + `<button class="mkhost" data-host="${p.id}" title="指定為房主">👑</button>`
         + `<button class="kick" data-kick="${p.id}" title="踢出房間">✕</button>`
         + `</span>`
       : '';
-    return `<li><span class="dot ${dot}"></span><span class="pname">${crown}${esc(p.name)}${me}</span>${extra}${actions}</li>`;
+    return `<li>${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
   };
   let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
   html += orderedPlayers().map((p) => {
@@ -235,6 +264,14 @@ function renderBanner() {
         const parts = [1, 2, 3, 4, 5, 6].map((f) => `${f}=${s[f] || 0}`).join('　');
         return show(`✊ 開盅!各點數統計 — <strong>${parts}</strong> ・ 房主可按「再來一場」`);
       }
+      if (r.subGame === 'poker') {
+        if (r.loserId) {
+          const how = r.loseBy === 'exhausted' ? '重骰用完' : '認輸';
+          return show(`🏳️ <strong>${nm(r.loserId)}</strong> ${how},輸了! ・ 房主可按「再來一場」`);
+        }
+        const low = (r.lowestIds || []).map(nm).join('、');
+        return show(`🃏 話胚開牌!牌型最小:<strong>${low}</strong> — 由他「重骰」或「認輸」`);
+      }
       let msg = `<strong>${nm(g.chooserId)}</strong> 選「<strong>${esc(r.conditionName)}的拿掉</strong>」,開牌!`;
       if (r.losers && r.losers.length) msg += ` ・ 💀 ${r.losers.map(nm).join('、')} 失去所有骰子,輸了!`;
       else if (state.winnerId) msg += ` ・ 🏆 ${nm(state.winnerId)} 獲勝!`;
@@ -272,6 +309,17 @@ function renderBoard() {
   const g = state.game;
   if (!g) { board.innerHTML = '<p class="muted center-pad">選擇模式後開始遊戲 🎲</p>'; return; }
 
+  // 話胚:初次一次開全部牌 → 靜態(不轉動);之後(重骰)點數變動才滾動
+  const pokerReveal = !!(g.reveal && g.reveal.subGame === 'poker');
+  const pokerInitial = pokerReveal && !pokerStaticDone;
+  // 我是否為可重骰者(最小者)→ 可鎖定自己的骰子
+  const iCanReroll = pokerReveal && g.phase === 'pokerCompare'
+    && (g.reveal.lowestIds || []).includes(myId);
+  if (!iCanReroll) lockedDice.clear();
+  // 本次 render 是否有「新的重骰」要播放動畫(由 server 帶來:誰、重骰了哪些索引)
+  const lastRoll = pokerReveal ? g.reveal.lastRoll : null;
+  const isNewRoll = !!(lastRoll && lastRoll.seq !== lastRollSeq);
+
   // 確保每位玩家一個 cell(保留 dice DOM 以利動畫);自己排第一個
   let ordered = orderedPlayers();
   // 吹牛骰「抓(開盅)」之前:完全只顯示自己,其他人不呈現
@@ -282,6 +330,7 @@ function renderBoard() {
   // 移除多餘 cell
   [...board.children].forEach((c) => { if (!wanted.includes(c.dataset.pid)) { board.removeChild(c); diceCache.delete('cell-' + c.dataset.pid); } });
 
+  let idx = 0;
   for (const p of ordered) {
     let cell = board.querySelector(`[data-pid="${p.id}"]`);
     if (!cell) {
@@ -290,11 +339,19 @@ function renderBoard() {
       cell.dataset.pid = p.id;
       cell.innerHTML = `<div class="cell-name"></div><div class="dice-stage"></div><div class="cell-info muted"></div>`;
     }
-    board.appendChild(cell); // 依序 append(會把既有節點移到正確順序)
+    // 只在位置不對時才搬移:重新插入 DOM 會打斷進行中的 CSS 動畫,
+    // 故避免每次 render 都搬動(否則別人重骰的滾動會被後續 render 截斷)
+    if (board.children[idx] !== cell) board.insertBefore(cell, board.children[idx] || null);
+    idx++;
     cell.querySelector('.cell-name').innerHTML =
       (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '');
     const stage = cell.querySelector('.dice-stage');
     const info = cell.querySelector('.cell-info');
+
+    // 話胚:牌型最小者加外框
+    const lowPoker = g.mode === 'mixed' && g.reveal && g.reveal.subGame === 'poker'
+      && (g.reveal.lowestIds || []).includes(p.id);
+    cell.classList.toggle('lowest', !!lowPoker);
 
     if (g.mode === 'roll') {
       const dice = g.rolls[p.id];
@@ -326,8 +383,19 @@ function renderBoard() {
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
       if (reveal && reveal.hands[p.id]) {
-        showDice(stage, 'cell-' + p.id, reveal.hands[p.id], false, true); // 開牌:靜態亮點數(無動畫)
-        markRemovedDice(stage, reveal.hands[p.id], reveal.condition);     // 要被拿掉的畫叉叉
+        const key = 'cell-' + p.id;
+        const hand = reveal.hands[p.id];
+        if (reveal.subGame === 'poker' && !pokerInitial && isNewRoll && lastRoll.id === p.id) {
+          // 這手剛重骰:強制滾動「沒被鎖定」的骰子(即使新點數和原本相同也要轉)
+          showDice(stage, key, hand, false, false, lastRoll.idx);
+        } else {
+          // 紅黑/吹牛開牌靜態;話胚初次開全部牌靜態;其餘維持(沒變則 no-op)
+          const staticShow = (reveal.subGame !== 'poker') || pokerInitial;
+          showDice(stage, key, hand, false, staticShow);
+        }
+        markRemovedDice(stage, hand, reveal.condition);     // 要被拿掉的畫叉叉
+        // 話胚:輪到我重骰時,我的骰子可點選鎖定(灰框);其餘情況清掉鎖定 UI
+        if (reveal.subGame === 'poker' && p.id === myId) applyLockUI(stage, iCanReroll);
       } else if (p.id === myId && g.myDice && g.myDice.length) {
         showDice(stage, 'cell-' + p.id, g.myDice);           // 自己的暗骰(2 顆以上才看得到)
       } else if (g.phase === 'rolling' && !(g.rolled || []).includes(p.id)) {
@@ -337,8 +405,10 @@ function renderBoard() {
         const n = g.diceLeft ? (g.diceLeft[p.id] ?? 0) : 0;
         showDice(stage, 'cell-' + p.id, Array(n).fill(0), true); // 他人(或盲骰者自己)蓋著的骰盅
       }
-      // 結算顯示被拿掉幾顆;盲骰者(只剩 1 顆)提示
-      if (reveal && reveal.removed && reveal.removed[p.id] != null) {
+      // 話胚:顯示牌型名稱(最小者標記);紅黑:顯示被拿掉幾顆;盲骰者提示
+      if (reveal && reveal.subGame === 'poker' && reveal.ranks) {
+        info.textContent = (reveal.ranks[p.id] || '') + (lowPoker ? ' ⚠️ 最小' : '');
+      } else if (reveal && reveal.removed && reveal.removed[p.id] != null) {
         const rm = reveal.removed[p.id];
         info.textContent = rm > 0 ? `拿掉 ${rm} 顆` : '保留';
       } else if (p.id === myId && g.blind) {
@@ -348,6 +418,10 @@ function renderBoard() {
       }
     }
   }
+
+  // 初次靜態開牌完成後,後續話胚點數變動(重骰)就改用滾動;離開話胚則重置
+  pokerStaticDone = pokerReveal;
+  if (isNewRoll) lastRollSeq = lastRoll.seq; // 標記本次重骰動畫已播放
 }
 
 function renderControls() {
@@ -397,6 +471,32 @@ function renderControls() {
         ? '<p class="muted">已搖骰,等待其他人…</p>'
         : `<button id="roll">${label}</button>`;
       $('roll')?.addEventListener('click', () => act('action', { type: 'roll' }));
+      return;
+    }
+    if (g.phase === 'pokerCompare') {
+      const low = (g.reveal && g.reveal.lowestIds) || [];
+      if (low.includes(myId)) {
+        const left = (g.reveal.rerolls && g.reveal.rerolls[myId]) || 0;
+        const lockPaid = !!(g.reveal.lockUsed && g.reveal.lockUsed[myId]); // 本段已用過鎖定
+        // 第一次用鎖定扣 2,之後鎖定也只扣 1
+        const cost = (lockedDice.size > 0 && !lockPaid) ? 2 : 1;
+        const canAfford = left >= cost;
+        const costNote = cost > 1 ? `,本次扣 ${cost}` : '';
+        el.innerHTML = '<div class="bid-row">'
+          + `<button id="reroll"${canAfford ? '' : ' disabled'}>🎲 重骰 (剩 ${left}${costNote})</button>`
+          + '<button id="concede" class="secondary">🏳️ 認輸</button>'
+          + '</div>';
+        $('reroll')?.addEventListener('click', () => {
+          const locked = [...lockedDice];
+          const c = (locked.length > 0 && !lockPaid) ? 2 : 1;
+          if (left < c) { toast(`重骰次數不足(本次需 ${c} 次,剩 ${left})`); return; }
+          act('action', { type: 'reroll', locked });
+        });
+        $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
+      } else {
+        const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : ''; }).join('、');
+        el.innerHTML = `<p class="muted">等待 ${names} 重骰或認輸…</p>`;
+      }
       return;
     }
     if (g.phase === 'bluffReady') {

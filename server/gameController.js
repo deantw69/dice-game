@@ -161,6 +161,8 @@ export function onPlayerLeft(room, leftId) {
         if (r.phase === 'condition' && r.chooserId === leftId) {
           r.chooserId = r.order[0];
         }
+        // 話胚比較中 → 重新評定最小者
+        mode.refreshPoker?.(r, room.match);
       }
     }
     if (mode.isMatchOver(room.match, room.players)) {

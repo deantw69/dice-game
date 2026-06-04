@@ -56,18 +56,29 @@ export function createRenderer(container, options = {}) {
     }
   }
 
-  function rollTo(values) {
+  // rollIdx:只滾動這些索引的骰子;其餘瞬間定位(不旋轉)。未提供 → 全部滾動
+  function rollTo(values, rollIdx) {
     if (values.length !== dice.length) setCount(values.length);
+    const animSet = rollIdx ? new Set(rollIdx) : null;
     // 強制 reflow:確保剛建立 / 重設的骰子會以 transition 動畫翻滾,而非瞬間跳到結果
     void container.offsetWidth;
     return new Promise((resolve) => {
       dice.forEach((d, i) => {
         const target = SHOW_ROTATION[values[i]];
-        // 每次累加整圈,讓動畫每次都翻滾(3~5 圈,依骰子變化)
-        d.spins += 3 + Math.floor(((i * 37 + values[i] * 13) % 3));
-        const x = target.x + 360 * d.spins;
-        const y = target.y + 360 * d.spins;
-        d.die.style.transform = `rotateX(${x}deg) rotateY(${y}deg)`;
+        if (!animSet || animSet.has(i)) {
+          // 每次累加整圈,讓動畫每次都翻滾(3~5 圈,依骰子變化)
+          d.spins += 3 + Math.floor(((i * 37 + values[i] * 13) % 3));
+          const x = target.x + 360 * d.spins;
+          const y = target.y + 360 * d.spins;
+          d.die.style.transform = `rotateX(${x}deg) rotateY(${y}deg)`;
+        } else {
+          // 不滾動的骰子(鎖定 / 點數沒變):瞬間定位到該點數,不旋轉
+          d.die.style.transition = 'none';
+          d.spins = 0;
+          d.die.style.transform = `rotateX(${target.x}deg) rotateY(${target.y}deg)`;
+          void d.die.offsetWidth;
+          d.die.style.transition = '';
+        }
       });
       // 與 CSS transition 時長一致(1.4s)
       setTimeout(resolve, 1450);

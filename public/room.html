@@ -8,25 +8,27 @@
 </head>
 <body>
   <div class="room-wrap">
-    <header class="room-top">
-      <div class="room-code">
-        房號 <strong id="rcode">····</strong>
-        <button id="copy" class="mini">複製</button>
-      </div>
-      <div id="modeBadge" class="badge"></div>
-      <div class="top-actions">
-        <label id="autoNextWrap" class="auto-next" style="display:none"><input type="checkbox" id="autoNext"/> 自動下一場</label>
-        <button id="forceReset" class="mini danger" style="display:none">🔄 強制重來</button>
-        <button id="leave" class="secondary mini">離開</button>
-      </div>
-    </header>
+    <div class="room-sticky">
+      <header class="room-top">
+        <div class="room-code">
+          房號 <strong id="rcode">····</strong>
+          <button id="copy" class="mini">複製</button>
+        </div>
+        <div id="modeBadge" class="badge"></div>
+        <div class="top-actions">
+          <label id="autoNextWrap" class="auto-next" style="display:none"><input type="checkbox" id="autoNext"/> 自動下一場</label>
+          <button id="forceReset" class="mini danger" style="display:none">🔄 強制重來</button>
+          <button id="leave" class="secondary mini">離開</button>
+        </div>
+      </header>
 
-    <p id="toast" class="error" role="alert"></p>
-    <section id="banner" class="banner"></section>
-    <section id="loserBanner" class="loser-banner" style="display:none"></section>
-    <section id="controls" class="panel"></section>
-    <section id="pokerGuide" class="panel poker-guide" style="display:none"></section>
-    <section id="lobby" class="panel"></section>
+      <p id="toast" class="error" role="alert"></p>
+      <section id="banner" class="banner"></section>
+      <section id="loserBanner" class="loser-banner" style="display:none"></section>
+      <section id="controls" class="panel"></section>
+      <section id="pokerGuide" class="panel poker-guide" style="display:none"></section>
+      <section id="lobby" class="panel"></section>
+    </div>
 
     <div class="room-body">
       <main id="board"></main>

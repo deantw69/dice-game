@@ -277,8 +277,12 @@ button.danger:hover { filter: brightness(1.08); }
 /* 只顯示自己時(吹牛骰抓之前):格子撐滿寬度,骰子橫向鋪開 */
 #board.solo { grid-template-columns: 1fr; }
 .board-cell { background: var(--panel); border-radius: 12px; padding: 14px; text-align: center; }
+/* 自己的格子:只換背景色(不動外框,外框另有用途) */
+.board-cell.mine { background: linear-gradient(160deg, #34406f, #3a3170); }
 /* 話胚:牌型最小的玩家(可重骰/認輸)外框標記 */
 .board-cell.lowest { box-shadow: 0 0 0 3px #ff5d6c; }
+/* 正在等待此玩家做決定(選玩法 / 選條件)→ 同樣式外框 */
+.board-cell.deciding { box-shadow: 0 0 0 3px #ff5d6c; }
 /* 本局輸家公告(話胚 / 紅黑單雙 決出輸家):獨立大字區 */
 .loser-banner { text-align: center; padding: 14px 16px; margin: 6px 0; background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid #ff5d6c; border-radius: 14px; }
 .loser-banner .loser-title { font-size: 1rem; letter-spacing: 3px; color: #ffd0d6; margin-bottom: 4px; }

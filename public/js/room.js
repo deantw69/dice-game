@@ -127,11 +127,9 @@ function applyLockUI(container, locked, interactive) {
   });
 }
 
-// 把「自己」排到第一個(其餘維持原順序),讓每個人在自己畫面上都排第一
+// 依當下玩家列表的順序(不再把自己移到第一格)
 function orderedPlayers() {
-  const mine = state.players.filter((p) => p.id === myId);
-  const others = state.players.filter((p) => p.id !== myId);
-  return [...mine, ...others];
+  return [...state.players];
 }
 
 // ---- 主 render ----
@@ -351,7 +349,7 @@ function renderBanner() {
   if (g && g.mode === 'mixed') {
     if (state.status === 'playing' && g.phase === 'rolling') return show('🎲 搖出你的暗骰(只有你看得到)');
     if (state.status === 'playing' && g.phase === 'choosing') {
-      if (g.decider && g.decider !== myId) return show(`⏳ 等待由 <strong>${nm(g.decider)}</strong> 決定玩法…`);
+      if (g.decider && g.decider !== myId) return show(`⏳ 等待由 <span class="hl">${nm(g.decider)}</span> 決定玩法…`);
       return show(g.decider ? '👇 選擇這局玩法 — <strong>由你決定!</strong>' : '👇 選擇這局玩法 — <strong>任何人先按先決定!</strong>');
     }
     if (state.status === 'playing' && g.phase === 'bluffReady') return show('✊ 全員已搖完 — <strong>任何人可按「抓(開盅)」!</strong>');
@@ -435,6 +433,14 @@ function renderBoard() {
   const soloView = g.mode === 'liars' && !g.reveal;
   if (soloView) ordered = ordered.filter((p) => p.id === myId);
   board.classList.toggle('solo', soloView); // 單人視圖時格子撐滿寬度
+
+  // 正在等待哪位玩家做決定(選玩法 / 紅黑單雙選條件)→ 在其格子加外框
+  let decidingId = null;
+  if (g.mode === 'mixed' && state.status === 'playing') {
+    if (g.phase === 'choosing' && g.decider) decidingId = g.decider;
+    else if (g.phase === 'condition' && !g.openPick && g.chooserId) decidingId = g.chooserId;
+  }
+
   const wanted = ordered.map((p) => p.id);
   // 移除多餘 cell
   [...board.children].forEach((c) => { if (!wanted.includes(c.dataset.pid)) { board.removeChild(c); diceCache.delete('cell-' + c.dataset.pid); } });
@@ -452,6 +458,7 @@ function renderBoard() {
     // 故避免每次 render 都搬動(否則別人重骰的滾動會被後續 render 截斷)
     if (board.children[idx] !== cell) board.insertBefore(cell, board.children[idx] || null);
     idx++;
+    cell.classList.toggle('mine', p.id === myId); // 自己的格子用不同底色標示
     cell.querySelector('.cell-name').innerHTML =
       (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '');
     const stage = cell.querySelector('.dice-stage');
@@ -464,6 +471,7 @@ function renderBoard() {
     const lowPoker = g.mode === 'mixed' && g.reveal && g.reveal.subGame === 'poker'
       && (g.reveal.lowestIds || []).includes(p.id);
     cell.classList.toggle('lowest', !!lowPoker);
+    cell.classList.toggle('deciding', p.id === decidingId); // 正在等他決定 → 外框
 
     if (g.mode === 'roll') {
       const dice = g.rolls[p.id];
@@ -623,7 +631,7 @@ function renderControls() {
       // 由輸家決定:不是指定的人 → 只顯示等待
       if (g.decider && g.decider !== myId) {
         const d = state.players.find((p) => p.id === g.decider);
-        el.innerHTML = `<p class="muted">正在等待由 <strong>${esc(d ? d.name : '')}</strong> 決定玩法…</p>`;
+        el.innerHTML = `<p class="muted">正在等待由 <span class="hl">${esc(d ? d.name : '')}</span> 決定玩法…</p>`;
         return;
       }
       const hint = g.decider ? '(由你決定)' : '(任何人先按先決定)';

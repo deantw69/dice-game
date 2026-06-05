@@ -259,6 +259,10 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
   padding-top: 6px;
   box-shadow: 0 8px 14px -8px rgba(0,0,0,0.55);
 }
+/* 手機橫向(矮視窗):取消上半部釘頂,讓它隨頁面捲動,把畫面高度留給棋盤 */
+@media (orientation: landscape) and (max-height: 600px) {
+  .room-sticky { position: static; box-shadow: none; }
+}
 .room-top {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 16px; background: var(--panel); border-radius: 12px; margin-bottom: 12px;
@@ -392,3 +396,11 @@ select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: v
 .dice-stage .f4 { transform: rotateY(-90deg) translateZ(28px); }
 .dice-stage .f2 { transform: rotateX(90deg)  translateZ(28px); }
 .dice-stage .f5 { transform: rotateX(-90deg) translateZ(28px); }
+
+/* 手機:骰子區一排顯示兩位玩家 —— 每格佔半排(骰子大小維持原樣,塞不下會自動換行) */
+@media (max-width: 600px) {
+  #board { gap: 10px; }
+  .board-cell { flex: 1 1 calc(50% - 5px); min-width: 0; max-width: none; padding: 12px 8px; }
+  /* 吹牛骰開盅前單人視圖維持整排 */
+  #board.solo .board-cell { flex-basis: 100%; }
+}

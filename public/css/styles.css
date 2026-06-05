@@ -276,7 +276,7 @@ button.danger:hover { filter: brightness(1.08); }
 /* 懸浮玩家列表:右下角固定,有自己的捲動,不隨棋盤捲動;可收進右側 */
 .roster-float {
   position: fixed; right: 12px; bottom: 12px;
-  width: 220px; max-height: 62vh; overflow-y: auto;
+  width: 308px; max-height: 62vh; overflow-y: auto;
   z-index: 25;
   box-shadow: 0 14px 34px rgba(0,0,0,0.55);
   transition: transform .28s ease, opacity .28s ease;
@@ -288,7 +288,7 @@ button.danger:hover { filter: brightness(1.08); }
   padding: 8px 14px; font-size: .9rem;
 }
 @media (max-width: 600px) {
-  .roster-float { width: 190px; max-height: 56vh; }
+  .roster-float { width: min(266px, 92vw); max-height: 56vh; }
 }
 
 /* 手機優化:精簡上半部(header/banner/控制)的 padding 與間距,讓上半部變矮 */

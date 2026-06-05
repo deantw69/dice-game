@@ -146,6 +146,8 @@ function render() {
   // 房主才看得到「強制重來」與「自動下一場」(頂部常駐,隨時可勾)
   $('forceReset').style.display = state.you.isHost ? '' : 'none';
   $('autoNextWrap').style.display = state.you.isHost ? '' : 'none';
+  // 「我要暫離」:正式玩家才看得到(觀戰中/已暫離不顯示)
+  $('benchSelf').style.display = (!state.you.isAway && !state.you.isSpectator) ? '' : 'none';
   const anCb = $('autoNext'); if (anCb) anCb.checked = autoNext;
 
   renderRoster();
@@ -787,6 +789,12 @@ $('leave').addEventListener('click', async () => {
 });
 $('forceReset').addEventListener('click', () => {
   if (confirm('確定強制重來?目前這場將中止,回到大廳重新開始。')) act('forceReset', {});
+});
+$('benchSelf').addEventListener('click', () => {
+  const msg = state.you.isHost
+    ? '確定暫離?房主會自動轉給下一位,按「我回來了」才會以觀戰身分回歸。'
+    : '確定暫離?你會移到暫離觀戰區,按「我回來了」才回歸。';
+  if (confirm(msg)) act('benchSelf', {});
 });
 // 自動下一場(頂部常駐,房主隨時可切換)
 $('autoNext').addEventListener('change', (e) => {

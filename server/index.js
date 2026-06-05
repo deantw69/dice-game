@@ -203,6 +203,19 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  // 玩家把自己丟入暫離觀戰區(房主自己暫離會自動把房主轉給下一位)
+  socket.on('benchSelf', (_payload, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me) return cb?.({ error: '找不到你的座位' });
+    const res = rm.benchPlayer(room, me.id); // 內部會處理房主轉移
+    if (res.error) return cb?.({ error: res.error });
+    gc.onPlayerLeft(room, me.id); // 移出後重新判定回合
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   // 暫離玩家按「我回來了」→ 回到 spectators(下一局加入)
   socket.on('imBack', (_payload, cb) => {
     const room = rm.findRoomBySocket(socket.id);

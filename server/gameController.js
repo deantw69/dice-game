@@ -136,17 +136,28 @@ function recordLosses(room) {
   }
   const uniq = [...new Set(losers)];
   room.lastLosers = uniq; // 上一場輸家(可能為空,如吹牛)
+  // 記住本場「選條件/玩法的人」,作為下一場順位決定者的起點
+  room.lastChooserId = (room.round && room.round.chooserId) || null;
   if (!room.losses) room.losses = {};
   for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
 }
 
-// 「由輸家決定」:取上一場輸家中,玩家列表順位最上(且仍在場)者
+// 「由輸家決定」(順位制):從上一場「選條件的人」往下順位,
+// 碰到的第一個輸家來決定本場玩法(例:#4 選黑使 #2、#6 輸 → 從 #4 往下先遇到 #6)。
 function computeDecider(room) {
   if (!room.loserDecides) return null;
   const losers = room.lastLosers || [];
   if (!losers.length) return null; // 首場或無輸家 → 不限制
-  for (const p of room.players) {
-    if (losers.includes(p.id)) return p.id; // room.players 即加入順位,上面優先
+  const order = room.players.map((p) => p.id); // 座位(加入)順序
+  if (!order.length) return null;
+  const seed = room.lastChooserId;
+  // 選條件的人自己也輸 → 仍由他自己決定下一場
+  if (seed && losers.includes(seed)) return seed;
+  const startIdx = (seed && order.includes(seed)) ? order.indexOf(seed) : -1;
+  // 否則從 chooser 的「下一位」開始往下繞一圈,找第一個輸家
+  for (let k = 1; k <= order.length; k++) {
+    const id = order[(startIdx + k + order.length) % order.length];
+    if (losers.includes(id)) return id;
   }
   return null;
 }

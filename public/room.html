@@ -32,8 +32,14 @@
 
     <div class="room-body">
       <main id="board"></main>
-      <aside id="roster" class="panel"></aside>
     </div>
+
+    <!-- 懸浮玩家列表(右下角,可收起,不隨棋盤捲動) -->
+    <aside id="roster" class="panel roster-float">
+      <button id="rosterCollapse" class="mini roster-collapse" type="button" title="收起玩家列表">收起 ›</button>
+      <div id="rosterBody"></div>
+    </aside>
+    <button id="rosterOpen" class="roster-open" type="button" title="顯示玩家列表" style="display:none">👥 玩家</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

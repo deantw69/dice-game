@@ -271,8 +271,25 @@ button.danger:hover { filter: brightness(1.08); }
 .banner { background: rgba(77,208,255,0.12); border: 1px solid rgba(77,208,255,0.3); color: var(--text); padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; text-align: center; }
 .banner strong { color: var(--accent); }
 .panel { background: var(--panel); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-.room-body { display: grid; grid-template-columns: 1fr 240px; gap: 12px; align-items: start; }
-@media (max-width: 720px) { .room-body { grid-template-columns: 1fr; } }
+.room-body { display: block; }
+
+/* 懸浮玩家列表:右下角固定,有自己的捲動,不隨棋盤捲動;可收進右側 */
+.roster-float {
+  position: fixed; right: 12px; bottom: 12px;
+  width: 220px; max-height: 62vh; overflow-y: auto;
+  z-index: 25;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.55);
+  transition: transform .28s ease, opacity .28s ease;
+}
+.roster-float.collapsed { transform: translateX(calc(100% + 20px)); opacity: 0; pointer-events: none; }
+.roster-collapse { display: block; margin: 0 0 8px auto; }
+.roster-open {
+  position: fixed; right: 12px; bottom: 12px; z-index: 26;
+  padding: 8px 14px; font-size: .9rem;
+}
+@media (max-width: 600px) {
+  .roster-float { width: 190px; max-height: 56vh; }
+}
 
 /* 手機優化:精簡上半部(header/banner/控制)的 padding 與間距,讓上半部變矮 */
 @media (max-width: 600px) {

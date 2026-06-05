@@ -210,7 +210,7 @@ function renderPokerGuide() {
 }
 
 function renderRoster() {
-  const el = $('roster');
+  const el = $('rosterBody');
   const playerRow = (p, extra = '') => {
     const isHost = p.id === state.hostId;
     const me = p.id === myId ? ' (你)' : '';
@@ -759,4 +759,14 @@ $('autoNext').addEventListener('change', (e) => {
   autoNextArmed = false; // 重新切換 → 允許本次大廳重新排程
   maybeAutoNext();
 });
+
+// 懸浮玩家列表:收起 / 展開(記住偏好)
+function setRosterCollapsed(v) {
+  localStorage.setItem('dice.rosterCollapsed', v ? '1' : '0');
+  $('roster').classList.toggle('collapsed', v);
+  $('rosterOpen').style.display = v ? '' : 'none';
+}
+$('rosterCollapse').addEventListener('click', () => setRosterCollapsed(true));
+$('rosterOpen').addEventListener('click', () => setRosterCollapsed(false));
+setRosterCollapsed(localStorage.getItem('dice.rosterCollapsed') === '1');
 

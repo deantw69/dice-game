@@ -300,6 +300,8 @@ button.danger:hover { filter: brightness(1.08); }
   .badge { padding: 5px 10px; font-size: .8rem; }
   .banner { padding: 8px 10px; margin-bottom: 8px; }
   .panel { padding: 10px; margin-bottom: 8px; }
+  /* 手機:隱藏「目前模式」徽章,減少 header 擁擠 */
+  #modeBadge { display: none !important; }
 }
 
 .lobby-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -367,8 +369,8 @@ button.danger:hover { filter: brightness(1.08); }
 .bid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 /* 等待訊息中的玩家名稱highlight */
 .hl { color: var(--accent); font-weight: 700; }
-.auto-next { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .9rem; cursor: pointer; }
-.auto-next input { cursor: pointer; }
+.auto-next, .auto-roll { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .9rem; cursor: pointer; }
+.auto-next input, .auto-roll input { cursor: pointer; }
 select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 1rem; }
 
 /* 房間內骰子縮小一點 */

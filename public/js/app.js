@@ -10,14 +10,17 @@ const errEl = $('err');
 // ---- 輸入記憶(localStorage) ----
 const NAME_KEY = 'dice.lastName';
 const CODE_KEY = 'dice.lastCode';
+const CUSTOM_CODE_KEY = 'dice.lastCustomCode';
 
-// 開頁時帶入上次輸入的暱稱 / 房號
+// 開頁時帶入上次輸入的暱稱 / 房號 / 自訂房號
 nameInput.value = localStorage.getItem(NAME_KEY) || '';
 codeInput.value = localStorage.getItem(CODE_KEY) || '';
+customCodeInput.value = localStorage.getItem(CUSTOM_CODE_KEY) || '';
 
 // 即時記憶
 nameInput.addEventListener('input', () => localStorage.setItem(NAME_KEY, nameInput.value.trim()));
 codeInput.addEventListener('input', () => localStorage.setItem(CODE_KEY, codeInput.value.trim().toUpperCase()));
+customCodeInput.addEventListener('input', () => localStorage.setItem(CUSTOM_CODE_KEY, customCodeInput.value.trim().toUpperCase()));
 
 function showError(msg) {
   errEl.textContent = msg || '';

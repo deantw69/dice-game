@@ -1,7 +1,7 @@
 // 房間 UI 與 socket 事件繫結
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
-import { playAlert, playFanfare } from './dice/cupSound.js';
+import { playAlert, playFanfare, playRattle } from './dice/cupSound.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -701,6 +701,7 @@ function pressRoll() {
   const spin = () => {
     const vals = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 6));
     showDice(stage, 'cell-' + myId, vals); // 連續滾隨機點數
+    playRattle(400); // 喀啦喀啦(按住期間每個 tick 補一段,持續播放)
   };
   spin();
   rollSpin.timer = setInterval(spin, 360);
@@ -769,4 +770,15 @@ function setRosterCollapsed(v) {
 $('rosterCollapse').addEventListener('click', () => setRosterCollapsed(true));
 $('rosterOpen').addEventListener('click', () => setRosterCollapsed(false));
 setRosterCollapsed(localStorage.getItem('dice.rosterCollapsed') === '1');
+
+// 音效靜音切換(每位玩家各自控制,記在 localStorage)
+function setMuted(v) {
+  window.__cupMuted = v;
+  localStorage.setItem('dice.muted', v ? '1' : '0');
+  const b = $('muteToggle');
+  b.textContent = v ? '🔇' : '🔊';
+  b.title = v ? '音效已關(點擊開啟)' : '音效開啟(點擊靜音)';
+}
+$('muteToggle').addEventListener('click', () => setMuted(!window.__cupMuted));
+setMuted(localStorage.getItem('dice.muted') === '1');
 

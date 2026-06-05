@@ -444,6 +444,18 @@ function renderBanner() {
   el.innerHTML = '';
 }
 
+// 把一手骰子整理成各點數統計字串(只列出現的點數),例:⚀×2 ⚂×1 ⚄×2
+const DIE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+function pipCountSummary(dice) {
+  const cnt = [0, 0, 0, 0, 0, 0, 0];
+  for (const d of dice) if (d >= 1 && d <= 6) cnt[d]++;
+  const parts = [];
+  for (let v = 1; v <= 6; v++) {
+    if (cnt[v]) parts.push(`<span class="pip-stat"><b>${DIE_FACES[v]}</b>×${cnt[v]}</span>`);
+  }
+  return parts.join('');
+}
+
 function renderBoard() {
   const board = $('board');
   const g = state.game;
@@ -531,13 +543,15 @@ function renderBoard() {
           stage.innerHTML = '<div class="waiting">未搖骰</div>';
           diceCache.delete('cell-' + p.id);
         }
+        info.textContent = '';
       } else if (g.myDice && g.myDice.length) {
         showDice(stage, 'cell-' + p.id, g.myDice);           // 抓之前:只顯示自己的
+        info.innerHTML = pipCountSummary(g.myDice);          // 開牌前:自己的點數統計
       } else {
         stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
         diceCache.delete('cell-' + p.id);
+        info.textContent = '';
       }
-      info.textContent = '';
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
       if (reveal && reveal.hands[p.id]) {

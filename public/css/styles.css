@@ -311,12 +311,13 @@ button.danger:hover { filter: brightness(1.08); }
 .chip { background: #0c0f22; color: var(--text); border: 1px solid rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 999px; }
 .chip.active { background: var(--accent); color: #1a1300; border-color: var(--accent); }
 
-#board { min-height: 200px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-content: start; }
-/* 只顯示自己時(吹牛骰抓之前):格子撐滿寬度,骰子橫向鋪開 */
-#board.solo { grid-template-columns: 1fr; }
-.board-cell { background: var(--panel); border-radius: 12px; padding: 14px; text-align: center; }
-/* 自己的格子:只換背景色(不動外框,外框另有用途) */
-.board-cell.mine { background: linear-gradient(160deg, #34406f, #3a3170); }
+/* 玩家格採彈性置中換行:人數少不會被拉寬、不留空欄,同一列等高 */
+#board { min-height: 200px; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 14px; }
+.board-cell { flex: 1 1 190px; max-width: 260px; min-width: 150px; background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px 14px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+/* 只顯示自己時(吹牛骰抓之前):單一格置中加寬,骰子橫向鋪開 */
+#board.solo .board-cell { flex-basis: 100%; max-width: 480px; }
+/* 自己的格子:換背景色 + 青色細邊(外框 box-shadow 另有用途,故用 border) */
+.board-cell.mine { background: linear-gradient(160deg, #34406f, #3a3170); border-color: rgba(77,208,255,0.5); }
 /* 話胚:牌型最小的玩家(可重骰/認輸)外框標記 */
 .board-cell.lowest { box-shadow: 0 0 0 3px #ff5d6c; }
 /* 正在等待此玩家做決定(選玩法 / 選條件)→ 同樣式外框 */
@@ -349,9 +350,12 @@ button.danger:hover { filter: brightness(1.08); }
 .dice-stage { min-height: 90px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; perspective: 700px; }
 /* 純搖骰的骰盅版:需要較高空間容納骰盅與掀蓋 */
 .dice-stage.cup-cell { min-height: 200px; align-items: stretch; perspective: none; }
-.cell-info { margin-top: 6px; }
-.pip-stat { display: inline-block; margin: 0 6px; white-space: nowrap; }
+.cell-info { margin-top: 8px; }
+.pip-stat { display: inline-block; margin: 0 5px; white-space: nowrap; }
 .pip-stat b { font-size: 1.15em; font-weight: 400; }
+/* 純搖骰:總和做成藥丸標籤;領先者再加金色 */
+.sum-pill { display: inline-block; padding: 3px 12px; border-radius: 999px; background: #0c0f22; border: 1px solid rgba(255,255,255,0.12); font-weight: 700; }
+.sum-pill.lead { background: var(--accent); color: #1a1300; border-color: var(--accent); }
 .waiting { color: var(--muted); font-size: .9rem; }
 .cup { width: 56px; height: 56px; border-radius: 10px; background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: #e23b3b; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
 

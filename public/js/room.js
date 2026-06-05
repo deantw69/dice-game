@@ -495,6 +495,15 @@ function renderBoard() {
   // 移除多餘 cell
   [...board.children].forEach((c) => { if (!wanted.includes(c.dataset.pid)) { board.removeChild(c); diceCache.delete('cell-' + c.dataset.pid); } });
 
+  // 純搖骰:算出目前最高總和(用來標記領先者)
+  let rollMaxSum = -1;
+  if (g.mode === 'roll' && g.rolls) {
+    for (const p of ordered) {
+      const d = g.rolls[p.id];
+      if (d) rollMaxSum = Math.max(rollMaxSum, d.reduce((a, b) => a + b, 0));
+    }
+  }
+
   let idx = 0;
   for (const p of ordered) {
     let cell = board.querySelector(`[data-pid="${p.id}"]`);
@@ -528,7 +537,8 @@ function renderBoard() {
       if (dice) {
         showDice(stage, 'cell-' + p.id, dice);
         const sum = dice.reduce((a, b) => a + b, 0);
-        info.textContent = `總和 ${sum}`;
+        const lead = sum === rollMaxSum && rollMaxSum > 0;
+        info.innerHTML = `<span class="sum-pill${lead ? ' lead' : ''}">${lead ? '🥇 ' : ''}總和 ${sum}</span>`;
       } else {
         stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
         info.textContent = '';
@@ -539,11 +549,12 @@ function renderBoard() {
       if (reveal) {
         if (reveal.hands[p.id]) {
           showDice(stage, 'cell-' + p.id, reveal.hands[p.id], false, true); // 開盅:靜態亮點數(無動畫)
+          info.innerHTML = pipCountSummary(reveal.hands[p.id]);             // 開盅後:各家點數統計
         } else {
           stage.innerHTML = '<div class="waiting">未搖骰</div>';
           diceCache.delete('cell-' + p.id);
+          info.textContent = '';
         }
-        info.textContent = '';
       } else if (g.myDice && g.myDice.length) {
         showDice(stage, 'cell-' + p.id, g.myDice);           // 抓之前:只顯示自己的
         info.innerHTML = pipCountSummary(g.myDice);          // 開牌前:自己的點數統計

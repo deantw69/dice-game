@@ -145,7 +145,8 @@ function render() {
 
   // 房主才看得到「強制重來」與「自動下一場」(頂部常駐,隨時可勾)
   $('forceReset').style.display = state.you.isHost ? '' : 'none';
-  $('autoNextWrap').style.display = state.you.isHost ? '' : 'none';
+  // 吹牛骰整個模式都是吹牛 → 不提供自動下一場;混合模式仍顯示(僅吹牛子玩法那局不自動)
+  $('autoNextWrap').style.display = (state.you.isHost && state.modeId !== 'liars') ? '' : 'none';
   // 「我要暫離」:正式玩家才看得到(觀戰中/已暫離不顯示)
   $('benchSelf').style.display = (!state.you.isAway && !state.you.isSpectator) ? '' : 'none';
   const anCb = $('autoNext'); if (anCb) anCb.checked = autoNext;
@@ -335,6 +336,13 @@ function renderLobby() {
   $('shuffle')?.addEventListener('click', () => act('shufflePlayers', {}));
 }
 
+// 吹牛玩法不自動下一場(一定要房主手動按):吹牛骰模式、或混合模式上一局是吹牛子玩法
+function isBluffPlay() {
+  if (state.modeId === 'liars') return true;
+  if (state.modeId === 'mixed' && state.game && state.game.subGame === 'bluff') return true;
+  return false;
+}
+
 // 房主開啟「自動下一場」時:在大廳且已玩過一局 → 延遲後自動開下一場
 // 每次進大廳只排程一次(autoNextArmed),失敗只提示、不取消勾選,避免洗版
 function maybeAutoNext() {
@@ -344,7 +352,7 @@ function maybeAutoNext() {
     if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; }
     return;
   }
-  const should = state.you.isHost && autoNext && state.modeId && state.game;
+  const should = state.you.isHost && autoNext && state.modeId && state.game && !isBluffPlay();
   if (!should) {
     if (autoNextTimer) { clearTimeout(autoNextTimer); autoNextTimer = null; }
     return;
@@ -353,7 +361,7 @@ function maybeAutoNext() {
   autoNextArmed = true;
   autoNextTimer = setTimeout(async () => {
     autoNextTimer = null;
-    if (!(state.you.isHost && autoNext && state.status === 'lobby' && state.game)) return;
+    if (!(state.you.isHost && autoNext && state.status === 'lobby' && state.game && !isBluffPlay())) return;
     const res = await emit('startRound', {});
     if (res.error) toast('自動下一場:' + res.error); // 只提示,不關閉勾選
   }, 6000);

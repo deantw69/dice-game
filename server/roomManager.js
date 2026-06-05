@@ -174,6 +174,18 @@ export function shufflePlayers(room) {
   }
 }
 
+// 場上已無正式玩家但仍有觀戰者 → 自動把觀戰者轉為玩家;並確保房主存在於玩家中
+// (避免出現「房內 0 玩家、沒有房主、卻有觀戰者」的卡住狀態)
+export function ensurePlayers(room) {
+  if (room.players.length === 0 && room.spectators.length > 0) {
+    room.players.push(...room.spectators);
+    room.spectators = [];
+  }
+  if (room.players.length > 0 && !room.players.some((p) => p.id === room.hostId)) {
+    room.hostId = room.players[0].id;
+  }
+}
+
 // 把觀戰者併入正式玩家(於開始新一輪時呼叫)
 export function mergeSpectators(room) {
   if (room.spectators.length === 0) return;

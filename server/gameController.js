@@ -1,6 +1,6 @@
 // 遊戲流程控制 — 設定模式、開始一輪、分派動作、管理輪次/整場生命週期
 import { MODES, MODE_LIST } from './games/index.js';
-import { mergeSpectators } from './roomManager.js';
+import { mergeSpectators, ensurePlayers } from './roomManager.js';
 
 export function setMode(room, playerId, modeId) {
   if (room.hostId !== playerId) return { error: '只有房主能設定模式' };
@@ -164,55 +164,68 @@ function computeDecider(room) {
 
 // 玩家離開房間後,重新判定進行中的回合是否該結束(避免卡在等待離開者)
 export function onPlayerLeft(room, leftId) {
-  if (room.status !== 'playing' || !room.round || !room.modeId) return;
-  const mode = MODES[room.modeId];
+  if (room.status === 'playing' && room.round && room.modeId) {
+    const mode = MODES[room.modeId];
 
-  if (mode.id === 'roll') {
-    if (room.round.rolls) delete room.round.rolls[leftId];
-    if (room.players.length > 0 && mode.isRoundOver(room.round, room.players)) {
-      mode.finishRound(room.round, room.players);
-      room.status = 'lobby';
-    }
-  } else if (mode.id === 'liars') {
-    const r = room.round;
-    if (r.order && r.order.includes(leftId)) {
-      r.order = r.order.filter((id) => id !== leftId);
-      if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
-      if (r.hands) delete r.hands[leftId];
-      if (r.order.length === 0) room.status = 'lobby';
-    }
-    if (mode.isMatchOver(room.match, room.players)) {
-      room.matchOver = true;
-      const w = mode.winner(room.match, room.players);
-      room.winnerId = w ? w.id : null;
-      room.status = 'lobby';
-    }
-  } else if (mode.id === 'mixed') {
-    const r = room.round;
-    if (r.order && r.order.includes(leftId)) {
-      r.order = r.order.filter((id) => id !== leftId);
-      if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
-      if (r.hands) delete r.hands[leftId];
-      if (r.order.length === 0) {
+    if (mode.id === 'roll') {
+      if (room.round.rolls) delete room.round.rolls[leftId];
+      if (room.players.length > 0 && mode.isRoundOver(room.round, room.players)) {
+        mode.finishRound(room.round, room.players);
         room.status = 'lobby';
-      } else {
-        // 離開者是最後一個未搖的 → 進入下一階段(已選玩法則直接選條件)
-        if (r.phase === 'rolling' && r.order.every((id) => r.rolled.includes(id))) {
-          r.phase = r.subGame ? 'condition' : 'choosing';
+      }
+    } else if (mode.id === 'liars') {
+      const r = room.round;
+      if (r.order && r.order.includes(leftId)) {
+        r.order = r.order.filter((id) => id !== leftId);
+        if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
+        if (r.hands) delete r.hands[leftId];
+        if (r.order.length === 0) room.status = 'lobby';
+      }
+      if (mode.isMatchOver(room.match, room.players)) {
+        room.matchOver = true;
+        const w = mode.winner(room.match, room.players);
+        room.winnerId = w ? w.id : null;
+        room.status = 'lobby';
+      }
+    } else if (mode.id === 'mixed') {
+      const r = room.round;
+      if (r.order && r.order.includes(leftId)) {
+        r.order = r.order.filter((id) => id !== leftId);
+        if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
+        if (r.hands) delete r.hands[leftId];
+        if (r.order.length === 0) {
+          room.status = 'lobby';
+        } else {
+          // 離開者是最後一個未搖的 → 進入下一階段(已選玩法則直接選條件)
+          if (r.phase === 'rolling' && r.order.every((id) => r.rolled.includes(id))) {
+            r.phase = r.subGame ? 'condition' : 'choosing';
+          }
+          // 選條件的人離開 → 交給場上第一位接手決定
+          if (r.phase === 'condition' && r.chooserId === leftId) {
+            r.chooserId = r.order[0];
+          }
+          // 話胚比較中 → 重新評定最小者
+          mode.refreshPoker?.(r, room.match);
         }
-        // 選條件的人離開 → 交給場上第一位接手決定
-        if (r.phase === 'condition' && r.chooserId === leftId) {
-          r.chooserId = r.order[0];
-        }
-        // 話胚比較中 → 重新評定最小者
-        mode.refreshPoker?.(r, room.match);
+      }
+      if (mode.isMatchOver(room.match, room.players)) {
+        room.matchOver = true;
+        const w = mode.winner(room.match, room.players);
+        room.winnerId = w ? w.id : null;
+        room.status = 'lobby';
       }
     }
-    if (mode.isMatchOver(room.match, room.players)) {
-      room.matchOver = true;
-      const w = mode.winner(room.match, room.players);
-      room.winnerId = w ? w.id : null;
-      room.status = 'lobby';
-    }
   }
+
+  // 場上玩家全部離開 → 中止當前回合/整場,回到大廳(清乾淨,等同 forceReset)
+  if (room.status === 'playing' && room.players.length === 0) {
+    room.round = null;
+    room.match = null;
+    room.matchOver = false;
+    room.winnerId = null;
+    room.status = 'lobby';
+  }
+
+  // 回合結算後:若場上已無正式玩家但仍有觀戰者,自動把觀戰者轉正並補房主
+  ensurePlayers(room);
 }

@@ -226,14 +226,18 @@ function renderPokerGuide() {
 
 function renderRoster() {
   const el = $('rosterBody');
-  const playerRow = (p, extra = '') => {
+  const playerRow = (p, extra = '', opts = {}) => {
     const isHost = p.id === state.hostId;
     const me = p.id === myId ? ' (你)' : '';
     const dot = p.connected ? 'on' : 'off';
     // 房主用皇冠取代綠點(不重複);其他玩家顯示連線狀態圓點
     const lead = isHost ? '<span class="crown">👑</span>' : `<span class="dot ${dot}"></span>`;
-    const actions = (state.you.isHost && p.id !== myId)
+    const hostCtrl = state.you.isHost && p.id !== myId;
+    const benchBtn = (hostCtrl && opts.bench)
+      ? `<button class="bench" data-bench="${p.id}" title="丟入暫離觀戰區">💤</button>` : '';
+    const actions = hostCtrl
       ? `<span class="row-actions">`
+        + benchBtn
         + `<button class="mkhost" data-host="${p.id}" title="指定為房主">👑</button>`
         + `<button class="kick" data-kick="${p.id}" title="踢出房間">✕</button>`
         + `</span>`
@@ -245,7 +249,7 @@ function renderRoster() {
   html += state.players.map((p) => {
     const losses = (state.losses && state.losses[p.id]) || 0;
     const extra = ` <span class="muted">輸 ${losses} 次</span>`;
-    return playerRow(p, extra);
+    return playerRow(p, extra, { bench: true });
   }).join('');
   html += '</ul>';
   if (state.spectators.length) {
@@ -253,8 +257,17 @@ function renderRoster() {
     html += state.spectators.map((p) => playerRow(p)).join('');
     html += '</ul>';
   }
+  if (state.away && state.away.length) {
+    html += `<h3>💤 暫離觀戰 (按「我回來了」才回歸)</h3><ul class="roster">`;
+    html += state.away.map((p) => playerRow(p)).join('');
+    html += '</ul>';
+  }
   el.innerHTML = html;
 
+  // 房主:丟入暫離觀戰區
+  el.querySelectorAll('[data-bench]').forEach((b) =>
+    b.addEventListener('click', () => act('benchPlayer', { targetId: b.dataset.bench }))
+  );
   // 房主:踢人按鈕
   el.querySelectorAll('[data-kick]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -566,6 +579,13 @@ function renderBoard() {
 function renderControls() {
   const el = $('controls');
   const g = state.game;
+  if (state.you.isAway) {
+    el.style.display = '';
+    el.innerHTML = '<p class="muted">💤 你被移到暫離觀戰區</p>'
+      + '<button id="imback">🙋 我回來了</button>';
+    $('imback')?.addEventListener('click', () => act('imBack', {}));
+    return;
+  }
   if (state.you.isSpectator) {
     el.style.display = '';
     el.innerHTML = '<p class="muted">👀 觀戰中,下一輪開始時自動加入</p>';

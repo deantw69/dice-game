@@ -20,7 +20,7 @@ app.use(express.static(PUBLIC_DIR));
 // 把房間狀態(個人化視圖)推送給每位成員
 function broadcastRoom(room) {
   if (!room) return;
-  for (const p of [...room.players, ...room.spectators]) {
+  for (const p of [...room.players, ...room.spectators, ...(room.away || [])]) {
     if (p.connected && p.socketId) {
       io.to(p.socketId).emit('roomState', rm.viewFor(room, p.id));
     }
@@ -189,6 +189,32 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  // 房主把(閒置)玩家丟入暫離觀戰區
+  socket.on('benchPlayer', ({ targetId }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能操作' });
+    if (targetId === me.id) return cb?.({ error: '不能把自己丟入暫離區' });
+    const res = rm.benchPlayer(room, targetId);
+    if (res.error) return cb?.({ error: res.error });
+    gc.onPlayerLeft(room, targetId); // 移出後重新判定回合
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
+  // 暫離玩家按「我回來了」→ 回到 spectators(下一局加入)
+  socket.on('imBack', (_payload, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me) return cb?.({ error: '找不到你' });
+    const res = rm.imBack(room, me.id);
+    if (res.error) return cb?.({ error: res.error });
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   socket.on('disconnect', (reason) => {
     console.log(`[socket] disconnected: ${socket.id} (${reason})`);
     rm.handleDisconnect(socket.id, (room, pid) => {
@@ -201,7 +227,7 @@ io.on('connection', (socket) => {
 });
 
 function playerBySocket(room, socketId) {
-  return [...room.players, ...room.spectators].find((p) => p.socketId === socketId) || null;
+  return [...room.players, ...room.spectators, ...(room.away || [])].find((p) => p.socketId === socketId) || null;
 }
 
 httpServer.listen(PORT, () => {

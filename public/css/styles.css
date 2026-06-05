@@ -361,6 +361,8 @@ button.danger:hover { filter: brightness(1.08); }
 .kick:hover { background: rgba(255,138,138,0.15); filter: none; }
 .mkhost { background: transparent; color: var(--accent); border: 1px solid rgba(255,204,77,0.45); padding: 1px 8px; border-radius: 6px; font-size: .8rem; line-height: 1.4; }
 .mkhost:hover { background: rgba(255,204,77,0.15); filter: none; }
+.bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: 6px; font-size: .8rem; line-height: 1.4; }
+.bench:hover { background: rgba(77,208,255,0.15); filter: none; }
 .roster h3, #roster h3 { margin: 6px 0; font-size: 1rem; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .roster .crown { font-size: 1rem; line-height: 1; flex-shrink: 0; }

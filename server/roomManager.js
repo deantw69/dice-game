@@ -37,6 +37,7 @@ export function createRoom(name, socketId) {
     status: 'lobby',     // lobby | playing
     players: [host],     // 正式參與者
     spectators: [],      // 等待下一輪加入
+    away: [],            // 暫離觀戰區(房主丟入;需按「我回來了」才會回到 spectators)
     match: null,         // 整場狀態(吹牛骰)
     matchOver: false,
     round: null,         // 當前一輪
@@ -80,13 +81,18 @@ export function rejoin(code, playerId, socketId) {
   return { room, player };
 }
 
+// 房間全部成員(含暫離區)
+function allMembers(room) {
+  return [...room.players, ...room.spectators, ...(room.away || [])];
+}
+
 export function findPlayer(room, playerId) {
-  return [...room.players, ...room.spectators].find((p) => p.id === playerId) || null;
+  return allMembers(room).find((p) => p.id === playerId) || null;
 }
 
 export function findRoomBySocket(socketId) {
   for (const room of rooms.values()) {
-    if ([...room.players, ...room.spectators].some((p) => p.socketId === socketId)) return room;
+    if (allMembers(room).some((p) => p.socketId === socketId)) return room;
   }
   return null;
 }
@@ -99,7 +105,7 @@ export function getRoom(code) {
 export function handleDisconnect(socketId, onTimeout) {
   const room = findRoomBySocket(socketId);
   if (!room) return null;
-  const player = [...room.players, ...room.spectators].find((p) => p.socketId === socketId);
+  const player = allMembers(room).find((p) => p.socketId === socketId);
   if (!player) return null;
   player.connected = false;
   player.disconnectTimer = setTimeout(() => {
@@ -112,15 +118,42 @@ export function handleDisconnect(socketId, onTimeout) {
 export function removePlayer(room, playerId) {
   room.players = room.players.filter((p) => p.id !== playerId);
   room.spectators = room.spectators.filter((p) => p.id !== playerId);
+  room.away = (room.away || []).filter((p) => p.id !== playerId);
 
   // 房主移交
   if (room.hostId === playerId && room.players.length > 0) {
     room.hostId = room.players[0].id;
   }
   // 房間清空 → 刪除
-  if (room.players.length === 0 && room.spectators.length === 0) {
+  if (room.players.length === 0 && room.spectators.length === 0 && room.away.length === 0) {
     rooms.delete(room.code);
   }
+}
+
+// 房主把玩家丟入暫離觀戰區(從 players / spectators 移到 away)
+export function benchPlayer(room, targetId) {
+  let idx = room.players.findIndex((p) => p.id === targetId);
+  let pl = null;
+  if (idx !== -1) { [pl] = room.players.splice(idx, 1); }
+  else {
+    idx = room.spectators.findIndex((p) => p.id === targetId);
+    if (idx !== -1) [pl] = room.spectators.splice(idx, 1);
+  }
+  if (!pl) return { error: '找不到該玩家' };
+  if (!room.away) room.away = [];
+  room.away.push(pl);
+  // 房主被丟(理論上禁止)→ 移交
+  if (room.hostId === targetId && room.players.length > 0) room.hostId = room.players[0].id;
+  return { room, player: pl };
+}
+
+// 暫離玩家按「我回來了」→ 移到 spectators(下一輪併入)
+export function imBack(room, playerId) {
+  const idx = (room.away || []).findIndex((p) => p.id === playerId);
+  if (idx === -1) return { error: '你不在暫離區' };
+  const [pl] = room.away.splice(idx, 1);
+  room.spectators.push(pl);
+  return { room, player: pl };
 }
 
 // 隨機打亂玩家順序(Fisher-Yates)
@@ -143,6 +176,7 @@ export function mergeSpectators(room) {
 export function viewFor(room, viewerId) {
   const mode = room.modeId ? MODES[room.modeId] : null;
   const isSpectator = room.spectators.some((p) => p.id === viewerId);
+  const isAway = (room.away || []).some((p) => p.id === viewerId);
 
   const view = {
     code: room.code,
@@ -158,7 +192,8 @@ export function viewFor(room, viewerId) {
     modes: MODE_LIST,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
-    you: { id: viewerId, isHost: room.hostId === viewerId, isSpectator },
+    away: (room.away || []).map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+    you: { id: viewerId, isHost: room.hostId === viewerId, isSpectator, isAway },
     game: null,
   };
 

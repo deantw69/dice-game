@@ -57,3 +57,9 @@ $('join').addEventListener('click', async () => {
 // Enter 快捷
 codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('join').click(); });
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') codeInput.focus(); });
+
+// 顯示版本號(git commit 短碼),方便辨認線上部署版本
+fetch('/version')
+  .then((r) => r.json())
+  .then(({ commit }) => { const el = $('version'); if (el) el.textContent = `版本 ${commit}`; })
+  .catch(() => {});

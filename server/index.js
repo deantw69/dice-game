@@ -15,6 +15,10 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
+// 版本資訊:用 Render 的 git commit 短碼,方便辨認線上是哪一版(本機為 dev)
+const COMMIT = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || 'dev';
+app.get('/version', (_req, res) => res.json({ commit: COMMIT }));
+
 app.use(express.static(PUBLIC_DIR));
 
 // 把房間狀態(個人化視圖)推送給每位成員

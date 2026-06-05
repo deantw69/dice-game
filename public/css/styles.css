@@ -34,6 +34,7 @@ a { color: var(--accent2); }
 
 h1 { margin: 0; font-size: 2.4rem; }
 .muted { color: var(--muted); }
+.version { font-size: .75rem; opacity: .6; margin-top: 4px; }
 
 /* ===== Demo 頁版面 ===== */
 .demo-wrap { max-width: 1000px; margin: 0 auto; padding: 24px; }

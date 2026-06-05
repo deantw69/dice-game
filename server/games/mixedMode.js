@@ -295,7 +295,7 @@ const FS = { 1: 6, 6: 5, 5: 4, 4: 3, 3: 2, 2: 1 };
 
 // 評估一手骰子 → { arr, label }
 // arr[0] 為牌型大分類(越大越好),其後為同型內的比較鍵(逐項比,越大越好)
-// 牌型(高→低):豹子(五同) > 鐵支(四同) > 葫蘆 > 順子 > 三條 > 兩對 > 一對 > 散牌
+// 牌型(高→低):豹子(五同) > 鐵支(四同) > 順子 > 葫蘆 > 三條 > 兩對 > 一對 > 散牌
 function evalHand(dice) {
   const count = {};
   for (const v of dice) count[v] = (count[v] || 0) + 1;
@@ -318,17 +318,17 @@ function evalHand(dice) {
   const triple = byRank.find((f) => count[f] === 3);
   const pairs = byRank.filter((f) => count[f] === 2);
 
-  // 葫蘆(3 + 2)
-  if (triple != null && pairs.length >= 1) {
-    return { arr: [6, FS[triple], FS[pairs[0]]], label: '葫蘆' };
-  }
-
-  // 順子(5 顆且為 12345 或 23456;12345 > 23456)
+  // 順子(5 顆且為 12345 或 23456;12345 > 23456)— 大於葫蘆
   if (dice.length === 5 && faces.length === 5) {
     const s = new Set(faces);
     const low = [1, 2, 3, 4, 5].every((x) => s.has(x));
     const high = [2, 3, 4, 5, 6].every((x) => s.has(x));
-    if (low || high) return { arr: [5, low ? 1 : 0], label: '順子' };
+    if (low || high) return { arr: [6, low ? 1 : 0], label: '順子' };
+  }
+
+  // 葫蘆(3 + 2)
+  if (triple != null && pairs.length >= 1) {
+    return { arr: [5, FS[triple], FS[pairs[0]]], label: '葫蘆' };
   }
 
   // 三條

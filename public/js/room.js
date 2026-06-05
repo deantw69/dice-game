@@ -201,7 +201,7 @@ function renderLoserBanner() {
 }
 
 // 選了話胚 → 顯示牌型大小順序(一橫排,精簡)
-const POKER_RANK_HTML = '🃏 牌型大小:<b>豹子</b> › 鐵支 › 葫蘆 › 順子 › 三條 › 兩對 › 一對 › 散牌';
+const POKER_RANK_HTML = '🃏 牌型大小:<b>豹子</b> › 鐵支 › 順子 › 葫蘆 › 三條 › 兩對 › 一對 › 散牌';
 function renderPokerGuide() {
   const el = $('pokerGuide');
   const show = !!(state.game && state.game.subGame === 'poker');

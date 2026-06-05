@@ -30,10 +30,12 @@ function broadcastRoom(room) {
 io.on('connection', (socket) => {
   console.log(`[socket] connected: ${socket.id}`);
 
-  socket.on('createRoom', ({ name }, cb) => {
+  socket.on('createRoom', ({ name, code }, cb) => {
     name = (name || '').trim();
     if (!name) return cb?.({ error: '請輸入暱稱' });
-    const { room, player } = rm.createRoom(name, socket.id);
+    const res = rm.createRoom(name, socket.id, code);
+    if (res.error) return cb?.({ error: res.error });
+    const { room, player } = res;
     socket.join(room.code);
     cb?.({ ok: true, code: room.code, playerId: player.id });
     broadcastRoom(room);

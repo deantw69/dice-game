@@ -26,8 +26,17 @@ function makePlayer(name, socketId) {
   return { id: genId(), name, socketId, connected: true, disconnectTimer: null };
 }
 
-export function createRoom(name, socketId) {
-  const code = genCode();
+const CUSTOM_CODE_RE = /^[A-Z0-9]{4}$/; // 自選房號:4 碼英數(大寫)
+
+export function createRoom(name, socketId, customCode) {
+  let code;
+  if (customCode != null && String(customCode).trim() !== '') {
+    code = String(customCode).trim().toUpperCase();
+    if (!CUSTOM_CODE_RE.test(code)) return { error: '房號需為 4 碼英數字' };
+    if (rooms.has(code)) return { error: '此房號已被使用,請換一個' };
+  } else {
+    code = genCode();
+  }
   const host = makePlayer(name, socketId);
   const room = {
     code,

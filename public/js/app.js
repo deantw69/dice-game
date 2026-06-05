@@ -4,6 +4,7 @@ import { emit, saveSession } from './net.js';
 const $ = (id) => document.getElementById(id);
 const nameInput = $('name');
 const codeInput = $('code');
+const customCodeInput = $('customCode');
 const errEl = $('err');
 
 // ---- 輸入記憶(localStorage) ----
@@ -33,7 +34,8 @@ $('create').addEventListener('click', async () => {
   showError('');
   const name = nameInput.value.trim();
   if (!name) return showError('請先輸入暱稱');
-  const res = await emit('createRoom', { name });
+  const code = customCodeInput.value.trim().toUpperCase();
+  const res = await emit('createRoom', { name, code: code || undefined });
   if (res.error) return showError(res.error);
   go(res.code, res.playerId, name);
 });

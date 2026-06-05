@@ -371,8 +371,8 @@ function renderBanner() {
           const how = r.loseBy === 'exhausted' ? '重骰用完' : '認輸';
           return show(`🏳️ <strong>${nm(r.loserId)}</strong> ${how},輸了! ・ 房主可按「再來一場」`);
         }
-        const low = (r.lowestIds || []).map(nm).join('、');
-        return show(`🃏 話胚開牌!牌型最小:<strong>${low}</strong> — 由他「重骰」或「認輸」`);
+        const low = (r.lowestIds || []).map((id) => `<span class="hl">${nm(id)}</span>`).join('、');
+        return show(`🃏 話胚開牌!牌型最小:${low} — 由他「重骰」或「認輸」`);
       }
       let msg = `<strong>${nm(g.chooserId)}</strong> 選「<strong>${esc(r.conditionName)}的拿掉</strong>」,開牌!`;
       if (r.losers && r.losers.length) msg += ` ・ 💀 ${r.losers.map(nm).join('、')} 失去所有骰子,輸了!`;
@@ -614,7 +614,7 @@ function renderControls() {
         });
         $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
       } else {
-        const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : ''; }).join('、');
+        const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; }).join('、');
         el.innerHTML = `<p class="muted">等待 ${names} 重骰或認輸…</p>`;
       }
       return;

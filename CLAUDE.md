@@ -30,10 +30,10 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 **伺服器權威(server-authoritative)**:所有骰子點數、回合狀態都在伺服器產生與保管;前端只負責呈現與送出動作。狀態**全存記憶體**(`roomManager.js` 的 `rooms` Map)——伺服器重啟/部署/休眠都會清空所有房間,符合設計。
 
 ### 後端三層
-- `server/index.js` — Socket.IO 事件接線層。每個 client→server 事件做基本驗證後委派給 `gameController`/`roomManager`,再呼叫 `broadcastRoom()`。所有事件都用 ack callback 回 `{ ok }` 或 `{ error }`。
+- `server/index.js` — Socket.IO 事件接線層。每個 client→server 事件做基本驗證後委派給 `gameController`/`roomManager`,再呼叫 `broadcastRoom()`。所有事件都用 ack callback 回 `{ ok }` 或 `{ error }`。另提供 `GET /version` 回傳部署的 git commit 短碼(首頁顯示;本機為 `dev`)。
 - `server/gameController.js` — **模式無關**的回合/整場生命週期:`setMode` / `startRound` / `handleAction` / `forceReset` / `onPlayerLeft`,以及「由輸家決定玩法」的順位計算(`computeDecider`)與輸家累計(`recordLosses`)。
 - `server/games/*.js` — 各遊戲模式,實作共同介面;在 `games/index.js` 的 `MODES` + `MODE_LIST` 註冊(`MODE_LIST` 的 `available:false` 會在 UI 隱藏並由 `setMode` 拒絕)。
-- `server/roomManager.js` — 房間/玩家成員、4 碼房號、重連、`viewFor()`(見下)。
+- `server/roomManager.js` — 房間/玩家成員、4 碼房號(可自訂)、重連、`viewFor()`(見下)。成員分**三區**:`players`(正式參與)、`spectators`(下一局加入)、`away`(暫離區);房間在三區皆空時才刪除。`createRoom` 可帶 `customCode`(4 碼英數,未被占用就用,否則回錯)。
 
 ### 遊戲模式介面(新增模式照這個寫)
 有兩種:
@@ -48,7 +48,8 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 ### 重連與離開
 - Client 在 `localStorage`(`dice.session`)存 `{ code, playerId }`;進房頁先 `emit('rejoin')` 用 `playerId` 接回原座位(換 socket/重新整理皆可)。
 - 斷線後保留座位 30 秒(`DISCONNECT_GRACE_MS`)再移除。
-- 任何成員變動(leave / kick / 斷線逾時)都會呼叫 `gameController.onPlayerLeft()` 重新判定當前回合是否該結束,避免卡在等待已離開的玩家。
+- **暫離**:玩家按「我要暫離」(`benchSelf`)移入 `away`、不參與下一局;按「我回來了」(`imBack`)回到 `spectators`。`viewFor` 也會推給 away 成員(`you.isAway`)。
+- 任何成員變動(leave / kick / 暫離 / 斷線逾時)都會呼叫 `gameController.onPlayerLeft()` 重新判定當前回合是否該結束,避免卡在等待已離開的玩家。
 
 ### 前端(`public/`)
 - `room.js` 是大宗:訂閱 `roomState`,每次收到就整頁 `render()`(roster / banner / board / controls 等)。狀態完全來自伺服器,前端不保留遊戲狀態。

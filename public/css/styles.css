@@ -344,8 +344,27 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: #ffd0d6; }
 .loser-popup .loser-hint { margin-top: 10px; font-size: .8rem; }
 /* 話胚:牌型大小順序(一橫排,精簡) */
-.poker-guide { padding: 8px 12px; font-size: .85rem; color: var(--muted); }
-.poker-guide b { color: var(--accent); }
+/* 話胚牌型提示:ℹ️ 按鈕浮動固定在左下角,完全不佔版面流、不擠棋盤 */
+.poker-guide { position: fixed; left: 12px; bottom: 12px; z-index: 25; background: none; padding: 0; margin: 0; }
+.poker-guide .chip { font-size: .85rem; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+/* 牌型大小 popup(點 ℹ️ 展開) */
+.rank-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
+.rank-popup .rank-card { background: var(--panel); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 18px 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); max-width: 90vw; }
+.rank-popup .rank-card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+.rank-popup .rank-list { margin: 0; padding-left: 1.4em; line-height: 1.8; }
+.rank-popup .rank-list b { color: var(--accent); }
+/* 吹牛開盅各點數統計 popup */
+.stats-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.stats-popup .stats-card {
+  pointer-events: auto; text-align: center; padding: 20px 26px; border-radius: 16px;
+  background: var(--panel); border: 2px solid var(--accent2);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 9999px rgba(0,0,0,0.3);
+  animation: loserPop .3s cubic-bezier(.2,.9,.3,1.25);
+}
+.stats-popup .stats-title { font-size: 1.1rem; color: var(--accent2); margin-bottom: 12px; }
+.stats-popup .stats-grid { display: grid; grid-template-columns: repeat(3, auto); gap: 8px 18px; justify-content: center; }
+.stats-popup .stat-cell { font-size: 1.3rem; font-weight: 700; }
+.stats-popup .stat-cell b { font-size: 1.5rem; font-weight: 400; }
 /* 話胚:可點選鎖定的骰子 */
 .die3d-scene.lockable { cursor: pointer; }
 /* 被鎖定的骰子:灰色外框 + 中央鎖頭 icon(重骰時點數不變) */
@@ -412,7 +431,29 @@ select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: v
 /* 手機:骰子區一排顯示兩位玩家 —— 每格佔半排(骰子大小維持原樣,塞不下會自動換行) */
 @media (max-width: 600px) {
   #board { gap: 10px; }
+  /* 手機:一橫排最多 2 個 */
   .board-cell { flex: 1 1 calc(50% - 5px); min-width: 0; max-width: none; padding: 12px 8px; }
   /* 吹牛骰開盅前單人視圖維持整排 */
   #board.solo .board-cell { flex-basis: 100%; }
+}
+
+/* 手機直向:cell 高度縮為約 60%,內容(骰子/字/間距)等比例縮小;欄寬不變(仍兩個一排) */
+@media (max-width: 600px) and (orientation: portrait) {
+  .board-cell { padding: 8px 5px; }
+  .cell-name { margin-bottom: 4px; font-size: .85rem; }
+  .cell-info { margin-top: 4px; font-size: .85rem; }
+  .dice-stage { min-height: 54px; gap: 6px; }
+  .dice-stage .die3d-scene, .dice-stage .die3d { width: 34px; height: 34px; }
+  .dice-stage .die3d .face { width: 34px; height: 34px; padding: 4px; border-radius: 6px; }
+  .dice-stage .die3d .pip { width: 5px; height: 5px; }
+  /* 立方體要接合:translateZ = 面寬的一半(34px → 17px),否則旋轉時會分離 */
+  .dice-stage .f1 { transform: rotateY(0deg)   translateZ(17px); }
+  .dice-stage .f6 { transform: rotateY(180deg) translateZ(17px); }
+  .dice-stage .f3 { transform: rotateY(90deg)  translateZ(17px); }
+  .dice-stage .f4 { transform: rotateY(-90deg) translateZ(17px); }
+  .dice-stage .f2 { transform: rotateX(90deg)  translateZ(17px); }
+  .dice-stage .f5 { transform: rotateX(-90deg) translateZ(17px); }
+  .die3d-scene.locked::before { font-size: 1rem; }
+  .cup { width: 34px; height: 34px; font-size: 1rem; border-radius: 6px; }
+  .sum-pill { padding: 2px 8px; font-size: .8rem; }
 }

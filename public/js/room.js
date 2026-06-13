@@ -32,6 +32,7 @@ let autoNextTimer = null;     // 自動下一場的延遲計時器
 let autoNextArmed = false;    // 本次進大廳是否已排程過(避免重複/洗版)
 let autoRoll = localStorage.getItem('dice.autoRoll') === '1'; // 玩家:搖骰環節自動骰
 let autoRolling = false;      // 防止自動骰重複送出
+let lobbyExpanded = false;    // 房主:一局結束後 lobby 預設精簡(只剩「再來一場/換模式」),按「換模式」才展開
 
 // ---- 連線 / 重連 ----
 async function doRejoin() {
@@ -157,6 +158,7 @@ function render() {
   // 「我要暫離」:正式玩家才看得到(觀戰中/已暫離不顯示)
   $('benchSelf').style.display = (!state.you.isAway && !state.you.isSpectator) ? '' : 'none';
   const anCb = $('autoNext'); if (anCb) anCb.checked = autoNext;
+  if (state.status !== 'lobby') lobbyExpanded = false; // 離開大廳 → 下次回大廳重新精簡
 
   // 話胚重骰:動畫期間先別切換「最小者外框/控制/橫幅」,等動畫(約 1.45s)停了再更新
   const _lr = (state.game && state.game.reveal && state.game.reveal.subGame === 'poker') ? state.game.reveal.lastRoll : null;
@@ -167,7 +169,7 @@ function render() {
   }
 
   renderRoster();
-  renderLobby();
+  if (!pokerRerollAnim) renderLobby();    // 重骰動畫期間保留前一畫面(避免輸家骰子還沒停 lobby 就跳出)
   if (!pokerRerollAnim) renderBanner();   // 重骰動畫期間保留前一畫面
   renderBoard();                          // 骰子動畫照常播放
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
@@ -383,9 +385,22 @@ function renderLobby() {
   const inLobby = state.status === 'lobby';
 
   // 只有房主、且在大廳時才顯示 lobby panel;非房主完全不顯示
-  if (!inLobby || !isHost) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  if (!inLobby || !isHost) { el.style.display = 'none'; el.innerHTML = ''; el.classList.remove('lobby-compact'); return; }
   el.style.display = '';
 
+  // 已玩過一局且尚未展開 → 精簡視圖:只顯示「再來一場/下一輪」+「換模式」,畫面乾淨
+  if (state.game && !lobbyExpanded) {
+    el.classList.add('lobby-compact'); // 高度對齊 controls panel
+    el.innerHTML = `<div class="lobby-row">`
+      + `<button id="start" ${state.modeId ? '' : 'disabled'}>${startButtonLabel()}</button>`
+      + `<button id="changeMode" class="secondary">🔧 換模式</button>`
+      + `</div>`;
+    $('start')?.addEventListener('click', () => act('startRound', {}));
+    $('changeMode')?.addEventListener('click', () => { lobbyExpanded = true; render(); });
+    return;
+  }
+
+  el.classList.remove('lobby-compact'); // 完整面板 → 取消精簡高度
   // 房主控制(只顯示開放的模式,未開放的隱藏)
   let html = '<div class="lobby-row"><span class="label">模式</span><div class="mode-btns">';
   for (const m of state.modes) {
@@ -546,7 +561,15 @@ function renderBoard() {
   if (!g) { board.innerHTML = '<p class="muted center-pad">選擇模式後開始遊戲 🎲</p>'; return; }
 
   // 按住搖骰:放開後結果已回 → 停止轉動,讓正常渲染收尾(滾到最終點數)
-  if (rollSpin.committing && myRollRegistered()) stopRollSpin();
+  if (rollSpin.committing) {
+    if (rollSpin.kind === 'reroll') {
+      // 話胚重骰:server 帶回新的 lastRoll(我這手、序號變了)就算完成
+      const lr = g.reveal && g.reveal.lastRoll;
+      if (lr && lr.id === myId && lr.seq !== lastRollSeq) stopRollSpin();
+    } else if (myRollRegistered()) {
+      stopRollSpin();
+    }
+  }
 
   // 話胚:初次一次開全部牌 → 靜態(不轉動);之後(重骰)點數變動才滾動
   const pokerReveal = !!(g.reveal && g.reveal.subGame === 'poker');
@@ -778,13 +801,10 @@ function renderControls() {
         const canAfford = left >= cost;
         const costNote = cost > 1 ? `,本次扣 ${cost}` : '';
         el.innerHTML = '<div class="bid-row">'
-          + `<button id="reroll"${canAfford ? '' : ' disabled'}>🎲 重骰 (剩 ${left}${costNote})</button>`
+          + `<button id="reroll"${canAfford ? '' : ' disabled'} title="按住不放,放開才重骰">🎲 重骰 (剩 ${left}${costNote})</button>`
           + '<button id="concede" class="secondary">🏳️ 認輸</button>'
           + '</div>';
-        $('reroll')?.addEventListener('click', () => {
-          if (left < cost) { toast(`重骰次數不足(本次需 ${cost} 次,剩 ${left})`); return; }
-          act('action', { type: 'reroll' });
-        });
+        // 重骰改由「按住→放開」處理(見 pressRoll/releaseRoll),與一般搖骰一致;次數不足時按鈕 disabled
         $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
       } else {
         const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; }).join('、');
@@ -850,11 +870,34 @@ function canRollNow() {
   const btn = document.getElementById('roll'); // 各模式的搖骰/搖下一骰按鈕
   return !!(btn && !btn.disabled);
 }
-function pressRoll() {
-  if (rollSpin.active || !canRollNow()) return;
-  rollSpin.active = true; rollSpin.committing = false;
+function canRerollNow() {
+  const btn = document.getElementById('reroll'); // 話胚重骰(次數不足時 disabled)
+  return !!(btn && !btn.disabled);
+}
+function pressRoll(kind = 'roll') {
+  if (rollSpin.active) return;
+  if (kind === 'reroll' ? !canRerollNow() : !canRollNow()) return;
+  rollSpin.active = true; rollSpin.committing = false; rollSpin.kind = kind;
   const cell = document.querySelector(`#board [data-pid="${myId}"]`);
   const stage = cell && cell.querySelector('.dice-stage');
+
+  if (kind === 'reroll') {
+    // 話胚重骰:只轉「沒被鎖定」的骰子,鎖定的保留原點數(與 server 重骰一致)
+    const g = state && state.game;
+    const cur = (g && g.reveal && g.reveal.hands && g.reveal.hands[myId]) || [];
+    const locked = new Set((g && g.reveal && g.reveal.lockBy === myId) ? (g.reveal.locked || []) : []);
+    if (!stage || !cur.length) return; // 找不到也沒關係,放開時仍會送出
+    const spin = () => {
+      const idx = [];
+      const vals = cur.map((v, i) => { if (locked.has(i)) return v; idx.push(i); return 1 + Math.floor(Math.random() * 6); });
+      if (idx.length) showDice(stage, 'cell-' + myId, vals, false, false, idx); // 強制滾動非鎖定骰
+      playRattle(400);
+    };
+    spin();
+    rollSpin.timer = setInterval(spin, 360);
+    return;
+  }
+
   const count = rollDiceCount();
   if (!stage || !count) return; // 找不到也沒關係,放開時仍會送出
   const spin = () => {
@@ -868,8 +911,9 @@ function pressRoll() {
 function releaseRoll() {
   if (!rollSpin.active || rollSpin.committing) return;
   rollSpin.committing = true;
-  if (!canRollNow()) { stopRollSpin(); return; }
-  emit('action', { type: 'roll' }).then((res) => {
+  const isReroll = rollSpin.kind === 'reroll';
+  if (isReroll ? !canRerollNow() : !canRollNow()) { stopRollSpin(); render(); return; }
+  emit('action', { type: isReroll ? 'reroll' : 'roll' }).then((res) => {
     if (res && res.error) { toast(res.error); stopRollSpin(); render(); }
     // 成功 → 等 roomState 廣播,在 renderBoard 收尾停住
   });
@@ -879,9 +923,11 @@ function stopRollSpin() {
   rollSpin.active = false; rollSpin.committing = false;
 }
 
-// 滑鼠/觸控按住搖骰鈕
+// 滑鼠/觸控按住搖骰鈕(一般搖骰 + 話胚重骰)
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest && e.target.closest('#roll')) { e.preventDefault(); pressRoll(); }
+  if (!e.target.closest) return;
+  if (e.target.closest('#roll')) { e.preventDefault(); pressRoll('roll'); }
+  else if (e.target.closest('#reroll')) { e.preventDefault(); pressRoll('reroll'); }
 });
 document.addEventListener('pointerup', () => releaseRoll());
 document.addEventListener('pointercancel', () => releaseRoll());
@@ -893,9 +939,8 @@ document.addEventListener('keydown', (e) => {
   if (e.repeat || !isSpace(e)) return;
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-  if (!canRollNow()) return;
-  e.preventDefault();
-  pressRoll();
+  if (canRollNow()) { e.preventDefault(); pressRoll('roll'); }
+  else if (canRerollNow()) { e.preventDefault(); pressRoll('reroll'); }
 });
 document.addEventListener('keyup', (e) => { if (isSpace(e)) releaseRoll(); });
 

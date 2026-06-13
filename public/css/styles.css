@@ -278,6 +278,9 @@ button.danger:hover { filter: brightness(1.08); }
 /* 動作面板高度固定,避免各階段切換時版面上下跳動;內容置中 */
 #controls { min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 #controls p { margin: 0; } /* 去掉 <p> 預設上下margin,避免文字版比按鈕版更高 */
+/* 精簡 lobby(只剩「再來一場/換模式」)→ 高度與置中對齊 #controls */
+#lobby.lobby-compact { min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+#lobby.lobby-compact .lobby-row { margin-bottom: 0; }
 .room-body { display: block; }
 
 /* 懸浮玩家列表:右下角固定,有自己的捲動,不隨棋盤捲動;可收進右側 */

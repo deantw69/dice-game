@@ -27,7 +27,6 @@
 
       <p id="toast" class="error" role="alert"></p>
       <section id="banner" class="banner"></section>
-      <section id="loserBanner" class="loser-banner" style="display:none"></section>
       <section id="controls" class="panel"></section>
       <section id="pokerGuide" class="panel poker-guide" style="display:none"></section>
       <section id="lobby" class="panel"></section>
@@ -44,6 +43,9 @@
     </aside>
     <button id="rosterOpen" class="roster-open" type="button" title="顯示玩家列表" style="display:none">👥 玩家</button>
   </div>
+
+  <!-- 本局輸家 popup(置中浮現,下一場開始自動消失;pointer-events:none 不擋按鈕) -->
+  <div id="loserPopup" class="loser-popup" style="display:none"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/js/room.js"></script>

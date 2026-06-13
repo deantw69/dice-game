@@ -255,7 +255,6 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
 /* 上半部釘在頂端:捲動看骰子時 header / banner / 搖骰鈕一直可見 */
 .room-sticky {
   position: sticky; top: 0; z-index: 20;
-  background: var(--bg);
   padding-top: 6px;
   box-shadow: 0 8px 14px -8px rgba(0,0,0,0.55);
 }
@@ -276,6 +275,9 @@ button.danger:hover { filter: brightness(1.08); }
 .banner { background: rgba(77,208,255,0.12); border: 1px solid rgba(77,208,255,0.3); color: var(--text); padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; text-align: center; }
 .banner strong { color: var(--accent); }
 .panel { background: var(--panel); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+/* 動作面板高度固定,避免各階段切換時版面上下跳動;內容置中 */
+#controls { min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+#controls p { margin: 0; } /* 去掉 <p> 預設上下margin,避免文字版比按鈕版更高 */
 .room-body { display: block; }
 
 /* 懸浮玩家列表:右下角固定,有自己的捲動,不隨棋盤捲動;可收進右側 */
@@ -327,10 +329,20 @@ button.danger:hover { filter: brightness(1.08); }
 /* 正在等待此玩家做決定(選玩法 / 選條件)→ 同樣式外框 */
 .board-cell.deciding { box-shadow: 0 0 0 3px #ff5d6c; }
 /* 本局輸家公告(話胚 / 紅黑單雙 決出輸家):獨立大字區 */
-.loser-banner { text-align: center; padding: 14px 16px; margin: 6px 0; background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid #ff5d6c; border-radius: 14px; }
-.loser-banner .loser-title { font-size: 1rem; letter-spacing: 3px; color: #ffd0d6; margin-bottom: 4px; }
-.loser-banner .loser-name { font-size: 2.6rem; font-weight: 900; color: #ff5d6c; line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
-.loser-banner .loser-reason { margin-top: 6px; font-size: 1.1rem; color: #ffd0d6; }
+/* 本局輸家 popup:置中浮現卡片;pointer-events:none → 純視覺,不擋按鈕 */
+.loser-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.loser-popup .loser-card {
+  pointer-events: auto; /* 卡片本身可接收點擊(點卡片不關;點外面才關) */
+  text-align: center; padding: 24px 36px; border-radius: 18px;
+  background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid #ff5d6c;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 9999px rgba(0,0,0,0.28);
+  animation: loserPop .3s cubic-bezier(.2,.9,.3,1.25);
+}
+@keyframes loserPop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.loser-popup .loser-title { font-size: 1.1rem; letter-spacing: 3px; color: #ffd0d6; margin-bottom: 4px; }
+.loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: #ff5d6c; line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
+.loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: #ffd0d6; }
+.loser-popup .loser-hint { margin-top: 10px; font-size: .8rem; }
 /* 話胚:牌型大小順序(一橫排,精簡) */
 .poker-guide { padding: 8px 12px; font-size: .85rem; color: var(--muted); }
 .poker-guide b { color: var(--accent); }

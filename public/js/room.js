@@ -242,7 +242,6 @@ function renderLoserBanner() {
   el.innerHTML = `<div class="loser-card">`
     + `<div class="loser-title">💀 本局輸家 💀</div>`
     + `<div class="loser-name">${names}</div>${reason}`
-    + `<div class="loser-hint muted">點旁邊空白處 / 下一場開始即消失</div>`
     + `</div>`;
   el.style.display = 'flex';
   playFanfare();
@@ -265,7 +264,6 @@ function renderBluffStats() {
   el.innerHTML = `<div class="stats-card">`
     + `<div class="stats-title">✊ 開盅!各點數統計</div>`
     + `<div class="stats-grid">${cells}</div>`
-    + `<div class="loser-hint muted">點旁邊空白處 / 下一場開始即消失</div>`
     + `</div>`;
   el.style.display = 'flex';
 }

@@ -233,7 +233,7 @@ function renderLoserBanner() {
   // 新輸家 → 建立內容(彈出動畫播一次)+ 音效
   lastLoserKey = key;
   loserDismissedKey = '';
-  const names = losers.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : '?'; }).join('、');
+  const names = losers.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : '?'; }).join('<br>');
   // 紅黑單雙:額外寫出因為被拿掉哪一種而輸
   const rv = state.game && state.game.reveal;
   const reason = (rv && rv.subGame === 'redblack' && rv.conditionName)

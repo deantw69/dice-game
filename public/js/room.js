@@ -15,6 +15,8 @@ if (!session || !session.playerId || session.code !== code) {
 let state = null;            // 最新 roomState
 const myId = session.playerId;
 const diceCache = new Map(); // cellKey -> { renderer, last }
+const rollSettled = {};      // 純搖骰:pid -> 已落定(動畫結束)的點數簽章,落定後才顯示總和
+const rollPending = {};      // 純搖骰:pid -> 已排定延遲顯示的點數簽章(避免重複排程)
 let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
 let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
 let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
@@ -535,14 +537,24 @@ function renderBoard() {
     if (g.mode === 'roll') {
       const dice = g.rolls[p.id];
       if (dice) {
+        const sig = dice.join(',');
         showDice(stage, 'cell-' + p.id, dice);
         const sum = dice.reduce((a, b) => a + b, 0);
         const lead = sum === rollMaxSum && rollMaxSum > 0;
-        info.innerHTML = `<span class="sum-pill${lead ? ' lead' : ''}">${lead ? '🥇 ' : ''}總和 ${sum}</span>`;
+        const settled = rollSettled[p.id] === sig;
+        // 一律放入總和膠囊(保留空間,框框大小不變);動畫未停前用 visibility 隱形
+        const hide = settled ? '' : ' style="visibility:hidden"';
+        info.innerHTML = `<span class="sum-pill${lead ? ' lead' : ''}"${hide}>${lead ? '🥇 ' : ''}總和 ${sum}</span>`;
+        if (!settled && rollPending[p.id] !== sig) {
+          rollPending[p.id] = sig;
+          setTimeout(() => { rollSettled[p.id] = sig; if (state) render(); }, 1500);
+        }
       } else {
         stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
         info.textContent = '';
         diceCache.delete('cell-' + p.id);
+        delete rollSettled[p.id];
+        delete rollPending[p.id];
       }
     } else if (g.mode === 'liars') {
       const reveal = g.reveal;

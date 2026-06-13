@@ -172,7 +172,7 @@ function render() {
   renderBoard();                          // 骰子動畫照常播放
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
   renderPokerGuide();
-  renderLoserBanner();
+  if (!pokerRerollAnim) renderLoserBanner(); // 重骰動畫期間先別跳輸家公告(等動畫停再顯示)
   renderBluffStats();
   maybeAutoNext();
 

@@ -412,11 +412,14 @@ function resolvePoker(round, match) {
 
 function resolveRedBlack(round, match, condId, cond) {
   const removed = {};
+  const removedIdx = {}; // 每人「要被拿掉」的骰子索引(前端據此畫叉,不必自行重算條件)
   for (const id of round.order) {
     const hand = round.hands[id] || [];
-    const cnt = hand.filter(cond.match).length;
-    removed[id] = cnt;
-    match.diceLeft[id] = Math.max(0, (match.diceLeft[id] || 0) - cnt);
+    const idxs = [];
+    hand.forEach((d, i) => { if (cond.match(d)) idxs.push(i); });
+    removedIdx[id] = idxs;
+    removed[id] = idxs.length;
+    match.diceLeft[id] = Math.max(0, (match.diceLeft[id] || 0) - idxs.length);
   }
   const losers = round.order.filter((id) => (match.diceLeft[id] || 0) === 0);
   const aliveCount = round.order.filter((id) => (match.diceLeft[id] || 0) > 0).length;
@@ -429,6 +432,7 @@ function resolveRedBlack(round, match, condId, cond) {
     conditionName: cond.name,
     hands: round.hands, // 開牌:公開本骰所有骰子
     removed,            // 每人被拿掉幾顆
+    removedIdx,         // 每人被拿掉的骰子索引(前端畫叉用)
     losers,             // 失去所有骰子者(輸)
     pending: false,
   };

@@ -15,6 +15,8 @@ export function setMode(room, playerId, modeId) {
   room.matchOver = false;
   room.round = null;
   room.winnerId = null;
+  room.lastLosers = [];      // 清掉上一場輸家,避免「由輸家決定」沿用已中止那場
+  room.lastChooserId = null;
   // 吹牛骰起始骰子數預設 5
   if (modeId === 'liars') room.diceCount = 5;
   return { ok: true };
@@ -33,6 +35,8 @@ export function forceReset(room, playerId) {
   room.match = null;
   room.matchOver = false;
   room.winnerId = null;
+  room.lastLosers = [];      // 強制重來 → 一併清掉上一場輸家/決定者起點
+  room.lastChooserId = null;
   room.status = 'lobby';
   return { ok: true };
 }
@@ -42,12 +46,13 @@ export function startRound(room, playerId) {
   if (!room.modeId) return { error: '請先選擇遊戲模式' };
   const mode = MODES[room.modeId];
 
-  // 觀戰者於每輪開始時併入
-  mergeSpectators(room);
-
-  if (room.players.length < mode.minPlayers) {
+  // 先確認「正式玩家 + 觀戰者」合計達標,才把觀戰者併入;
+  // 否則人數不足時 mergeSpectators 已清空 spectators 卻又回 error,會把觀戰者誤轉為正式玩家。
+  if (room.players.length + room.spectators.length < mode.minPlayers) {
     return { error: `此模式至少需要 ${mode.minPlayers} 人` };
   }
+  // 觀戰者於每輪開始時併入
+  mergeSpectators(room);
 
   if (mode.id === 'liars') {
     // 吹牛骰每局獨立(無淘汰)→ 每次開始都用「當前設定」重新發骰,改數量即時生效
@@ -175,24 +180,11 @@ export function onPlayerLeft(room, leftId) {
       }
     } else if (mode.id === 'liars') {
       const r = room.round;
-      if (r.order && r.order.includes(leftId)) {
-        r.order = r.order.filter((id) => id !== leftId);
-        if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
-        if (r.hands) delete r.hands[leftId];
-        if (r.order.length === 0) room.status = 'lobby';
-      }
-      if (mode.isMatchOver(room.match, room.players)) {
-        room.matchOver = true;
-        const w = mode.winner(room.match, room.players);
-        room.winnerId = w ? w.id : null;
-        room.status = 'lobby';
-      }
+      if (pruneRoundMember(r, leftId) && r.order.length === 0) room.status = 'lobby';
+      finishIfMatchOver(room, mode);
     } else if (mode.id === 'mixed') {
       const r = room.round;
-      if (r.order && r.order.includes(leftId)) {
-        r.order = r.order.filter((id) => id !== leftId);
-        if (r.rolled) r.rolled = r.rolled.filter((id) => id !== leftId);
-        if (r.hands) delete r.hands[leftId];
+      if (pruneRoundMember(r, leftId)) {
         if (r.order.length === 0) {
           room.status = 'lobby';
         } else {
@@ -208,12 +200,7 @@ export function onPlayerLeft(room, leftId) {
           mode.refreshPoker?.(r, room.match);
         }
       }
-      if (mode.isMatchOver(room.match, room.players)) {
-        room.matchOver = true;
-        const w = mode.winner(room.match, room.players);
-        room.winnerId = w ? w.id : null;
-        room.status = 'lobby';
-      }
+      finishIfMatchOver(room, mode);
     }
   }
 
@@ -228,4 +215,22 @@ export function onPlayerLeft(room, leftId) {
 
   // 回合結算後:若場上已無正式玩家但仍有觀戰者,自動把觀戰者轉正並補房主
   ensurePlayers(room);
+}
+
+// 把離場者從一輪的 order/rolled/hands 清掉;回傳此人原本是否在局內(供後續判定)
+function pruneRoundMember(round, leftId) {
+  if (!round || !round.order || !round.order.includes(leftId)) return false;
+  round.order = round.order.filter((id) => id !== leftId);
+  if (round.rolled) round.rolled = round.rolled.filter((id) => id !== leftId);
+  if (round.hands) delete round.hands[leftId];
+  return true;
+}
+
+// 整場結束判定(吹牛骰 / 混合模式共用):結束則記勝者、回大廳
+function finishIfMatchOver(room, mode) {
+  if (!mode.isMatchOver(room.match, room.players)) return;
+  room.matchOver = true;
+  const w = mode.winner(room.match, room.players);
+  room.winnerId = w ? w.id : null;
+  room.status = 'lobby';
 }

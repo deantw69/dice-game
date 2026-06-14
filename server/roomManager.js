@@ -63,8 +63,8 @@ export function createRoom(name, socketId, customCode) {
 export function joinRoom(code, name, socketId) {
   const room = rooms.get(code);
   if (!room) return { error: '找不到此房間' };
-  const all = [...room.players, ...room.spectators];
-  if (all.some((p) => p.name === name)) return { error: '此房間已有人用這個暱稱' };
+  // 重名檢查涵蓋三區(含暫離 away),避免暫離者暱稱被重用造成兩個同名玩家
+  if (allMembers(room).some((p) => p.name === name)) return { error: '此房間已有人用這個暱稱' };
 
   const player = makePlayer(name, socketId);
   if (room.status === 'playing') {

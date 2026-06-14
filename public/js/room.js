@@ -55,14 +55,25 @@ socket.on('kicked', () => {
 
 // ---- 小工具 ----
 let toastTimer;
-function toast(msg) {
-  $('toast').textContent = msg || '';
+const TOAST_TYPES = ['toast-show', 'toast-error', 'toast-success', 'toast-info'];
+function toast(msg, type = 'error') {
+  const el = $('toast');
+  el.textContent = msg || '';
+  el.classList.remove(...TOAST_TYPES);
   clearTimeout(toastTimer);
-  if (msg) toastTimer = setTimeout(() => ($('toast').textContent = ''), 3500);
+  if (msg) {
+    el.classList.add('toast-show', 'toast-' + type);
+    toastTimer = setTimeout(() => { el.textContent = ''; el.classList.remove(...TOAST_TYPES); }, 3500);
+  }
 }
 async function act(event, payload) {
   const res = await emit(event, payload);
   if (res.error) toast(res.error);
+}
+
+// 搖骰鈕:長按機制見 pressRoll/releaseRoll(提示只放 title tooltip,不佔版面)
+function rollBtn(label) {
+  return `<button id="roll" title="按住搖、放開定">${label}</button>`;
 }
 
 // 顯示骰子(快取 renderer)。staticShow=true 直接亮點數(無翻滾動畫,用於開牌)
@@ -95,24 +106,11 @@ function showDice(container, key, values, hidden = false, staticShow = false, ro
   container.querySelectorAll('.die3d-scene.marked').forEach((s) => s.classList.remove('marked'));
 }
 
-// 紅黑單雙條件判定(與後端一致)
-const COND_MATCH = {
-  red: (d) => d === 1 || d === 4,
-  black: (d) => !(d === 1 || d === 4),
-  odd: (d) => d % 2 === 1,
-  even: (d) => d % 2 === 0,
-  big: (d) => d >= 4,
-  small: (d) => d <= 3,
-};
-
-// 開牌時在「要被拿掉」的骰子上畫叉叉
-function markRemovedDice(container, values, condition) {
-  const fn = COND_MATCH[condition];
+// 開牌時在「要被拿掉」的骰子上畫叉叉(索引由後端 reveal.removedIdx 提供,前端不再自算條件)
+function markRemovedDice(container, removedIdx) {
+  const set = new Set(removedIdx || []);
   const scenes = container.querySelectorAll('.die3d-scene');
-  scenes.forEach((sc, i) => {
-    if (fn && fn(values[i])) sc.classList.add('marked');
-    else sc.classList.remove('marked');
-  });
+  scenes.forEach((sc, i) => sc.classList.toggle('marked', set.has(i)));
 }
 
 // 話胚:鎖定骰子(灰框+鎖頭)。locked=要顯示鎖定的索引(server 廣播,所有人可見);
@@ -695,7 +693,7 @@ function renderBoard() {
           const staticShow = (reveal.subGame !== 'poker') || pokerInitial;
           showDice(stage, key, hand, false, staticShow);
         }
-        markRemovedDice(stage, hand, reveal.condition);     // 要被拿掉的畫叉叉
+        markRemovedDice(stage, reveal.removedIdx && reveal.removedIdx[p.id]); // 要被拿掉的畫叉叉(索引來自後端)
         // 話胚:鎖定顯示給所有人看;只有「輪到我」時我的骰子可點選切換(重骰動畫期間先不更新)
         if (reveal.subGame === 'poker' && !pokerRerollAnim) {
           const interactive = p.id === myId && iCanReroll;
@@ -764,7 +762,7 @@ function renderControls() {
     const rolled = g.rolls[myId];
     el.innerHTML = rolled
       ? '<p class="muted">已搖骰,等待其他玩家…</p>'
-      : '<button id="roll">🎲 搖骰!</button>';
+      : rollBtn('🎲 搖骰!');
     return; // 搖骰改由「按住→放開」處理(見 pressRoll/releaseRoll)
   }
 
@@ -774,7 +772,7 @@ function renderControls() {
     el.innerHTML = '<div class="bid-row">'
       + (rolled
         ? `<span class="muted">${allRolled ? '全員已搖完' : '已搖骰,等待其他人…'}</span>`
-        : '<button id="roll">🎲 搖骰!</button>')
+        : '<button id="roll" title="按住搖、放開定">🎲 搖骰!</button>')
       + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
       + '</div>';
     $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
@@ -787,7 +785,7 @@ function renderControls() {
       const label = g.phase === 'reveal' ? '🎲 搖下一骰!' : '🎲 搖骰!';
       el.innerHTML = rolled
         ? '<p class="muted">已搖骰,等待其他人…</p>'
-        : `<button id="roll">${label}</button>`;
+        : rollBtn(label);
       return; // 搖骰改由「按住→放開」處理
     }
     if (g.phase === 'pokerCompare') {
@@ -878,6 +876,7 @@ function pressRoll(kind = 'roll') {
   if (rollSpin.active) return;
   if (kind === 'reroll' ? !canRerollNow() : !canRollNow()) return;
   rollSpin.active = true; rollSpin.committing = false; rollSpin.kind = kind;
+  document.getElementById(kind === 'reroll' ? 'reroll' : 'roll')?.classList.add('charging'); // 蓄力視覺
   const cell = document.querySelector(`#board [data-pid="${myId}"]`);
   const stage = cell && cell.querySelector('.dice-stage');
 
@@ -921,6 +920,8 @@ function releaseRoll() {
 function stopRollSpin() {
   if (rollSpin.timer) { clearInterval(rollSpin.timer); rollSpin.timer = null; }
   rollSpin.active = false; rollSpin.committing = false;
+  document.getElementById('roll')?.classList.remove('charging');
+  document.getElementById('reroll')?.classList.remove('charging');
 }
 
 // 滑鼠/觸控按住搖骰鈕(一般搖骰 + 話胚重骰)
@@ -946,8 +947,8 @@ document.addEventListener('keyup', (e) => { if (isSpace(e)) releaseRoll(); });
 
 // ---- 頂部按鈕 ----
 $('copy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(code); toast('已複製房號 ' + code); }
-  catch { toast('房號:' + code); }
+  try { await navigator.clipboard.writeText(code); toast('已複製房號 ' + code, 'success'); }
+  catch { toast('房號:' + code, 'info'); }
 });
 $('leave').addEventListener('click', async () => {
   await emit('leaveRoom', {});

@@ -980,7 +980,10 @@ function setRosterCollapsed(v) {
 }
 $('rosterCollapse').addEventListener('click', () => setRosterCollapsed(true));
 $('rosterOpen').addEventListener('click', () => setRosterCollapsed(false));
-setRosterCollapsed(localStorage.getItem('dice.rosterCollapsed') === '1');
+// 初始:有偏好就尊重;沒偏好時,手機預設收合(避免懸浮列表遮住骰子格),桌機維持展開
+const savedRoster = localStorage.getItem('dice.rosterCollapsed');
+const isMobileViewport = window.matchMedia('(max-width: 600px)').matches;
+setRosterCollapsed(savedRoster === '1' || (savedRoster === null && isMobileViewport));
 
 // 音效靜音切換(每位玩家各自控制,記在 localStorage)
 function setMuted(v) {

@@ -1,4 +1,5 @@
 :root {
+  /* 底色 / 品牌 */
   --bg: #0f1226;
   --bg2: #1a1f3d;
   --panel: #20264d;
@@ -8,6 +9,42 @@
   --muted: #9aa3cf;
   --pip: #1a1f3d;
   --die: #fdfdfd;
+
+  /* 語意色 */
+  --on-accent: #1a1300;     /* 放在金色 accent 上的深色文字 */
+  --on-accent2: #00222e;    /* 放在青色 accent2 上的深色文字 */
+  --danger: #e23b3b;        /* 危險按鈕 / 開牌叉叉 / 盅內紅字 */
+  --danger-text: #ff8a8a;   /* 錯誤文字 / 踢人 */
+  --pip-red: #d4232a;       /* 骰子 1、4 點 */
+  --lose: #ff5d6c;          /* 輸家 / 最小者 */
+  --lose-text: #ffd0d6;     /* 輸家卡片淺色字 */
+  --success: #54e08a;       /* 在線 / 成功 */
+  --offline: #6a7099;       /* 離線 */
+  --input-bg: #0c0f22;      /* 輸入框 / chip / 藥丸底 */
+  --lock: #ffb020;          /* 話胚鎖定:琥珀外框(與「要拿掉」的紅叉區隔) */
+
+  /* 邊框(白色透明度階梯) */
+  --border: rgba(255,255,255,0.15);       /* 控制元件 */
+  --border-soft: rgba(255,255,255,0.08);  /* 卡片 / 面板 */
+  --border-faint: rgba(255,255,255,0.06); /* 玩家格 */
+  --border-line: rgba(255,255,255,0.12);  /* 分隔線 / 藥丸 */
+
+  /* 圓角階梯 */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* 字級階梯 */
+  --fs-xs: .8rem;
+  --fs-sm: .9rem;
+  --fs-base: 1rem;
+  --fs-md: 1.1rem;
+  --fs-lg: 1.4rem;
+  --fs-xl: 2.4rem;
+
+  /* 陰影 */
+  --shadow-card: 0 10px 30px rgba(0,0,0,0.35);
 }
 
 * { box-sizing: border-box; }
@@ -32,7 +69,7 @@ a { color: var(--accent2); }
   text-align: center;
 }
 
-h1 { margin: 0; font-size: 2.4rem; }
+h1 { margin: 0; font-size: var(--fs-xl); }
 .muted { color: var(--muted); }
 .version { font-size: .75rem; opacity: .6; margin-top: 4px; }
 
@@ -46,18 +83,18 @@ h1 { margin: 0; font-size: 2.4rem; }
 }
 .demo-card {
   background: var(--panel);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
   padding: 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  box-shadow: var(--shadow-card);
 }
-.demo-card h2 { margin: 0 0 4px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
-.demo-card h2 .num { background: var(--accent); color: #1a1300; font-weight: 800; border-radius: 8px; padding: 1px 8px; font-size: .95rem; flex-shrink: 0; }
-.demo-card .tag { font-size: .8rem; color: var(--muted); margin-bottom: 12px; }
+.demo-card h2 { margin: 0 0 4px; font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; }
+.demo-card h2 .num { background: var(--accent); color: var(--on-accent); font-weight: 800; border-radius: var(--r-sm); padding: 1px 8px; font-size: .95rem; flex-shrink: 0; }
+.demo-card .tag { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 12px; }
 .stage {
   height: 280px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #11152e, #0c0f22);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, #11152e, var(--input-bg));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,19 +113,19 @@ h1 { margin: 0; font-size: 2.4rem; }
 
 button {
   background: var(--accent);
-  color: #1a1300;
+  color: var(--on-accent);
   border: none;
   padding: 10px 18px;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   cursor: pointer;
   transition: transform .08s ease, filter .2s ease;
 }
 button:not(:disabled):hover { filter: brightness(1.06); }
 button:active:not(:disabled) { transform: translateY(1px) scale(.99); }
 button:disabled { opacity: .5; cursor: not-allowed; }
-button.secondary { background: var(--panel); color: var(--text); border: 1px solid rgba(255,255,255,0.15); }
+button.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
 /* 鍵盤操作焦點可見(本遊戲支援空白鍵搖骰,焦點需明顯) */
 :focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
 /* 按住搖骰/重骰期間的「蓄力」視覺,讓「正在搖」有對應回饋 */
@@ -97,12 +134,12 @@ button.charging { animation: chargePulse .5s ease-in-out infinite; }
 
 label.field { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
 input[type="number"], input[type="text"] {
-  background: #0c0f22;
-  border: 1px solid rgba(255,255,255,0.15);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-base);
 }
 
 /* ===== CSS 3D 骰子 ===== */
@@ -115,8 +152,8 @@ input[type="number"], input[type="text"] {
   z-index: 5;
   pointer-events: none;
   background:
-    linear-gradient(to top left,  transparent calc(50% - 2px), #e23b3b calc(50% - 2px), #e23b3b calc(50% + 2px), transparent calc(50% + 2px)),
-    linear-gradient(to top right, transparent calc(50% - 2px), #e23b3b calc(50% - 2px), #e23b3b calc(50% + 2px), transparent calc(50% + 2px));
+    linear-gradient(to top left,  transparent calc(50% - 2px), var(--danger) calc(50% - 2px), var(--danger) calc(50% + 2px), transparent calc(50% + 2px)),
+    linear-gradient(to top right, transparent calc(50% - 2px), var(--danger) calc(50% - 2px), var(--danger) calc(50% + 2px), transparent calc(50% + 2px));
 }
 .die3d {
   width: 80px; height: 80px;
@@ -144,7 +181,7 @@ input[type="number"], input[type="text"] {
 }
 /* 傳統骰子:1 點與 4 點為紅色 */
 .die3d .f1 .pip,
-.die3d .f4 .pip { background: #d4232a; }
+.die3d .f4 .pip { background: var(--pip-red); }
 /* pip 位置(九宮格) */
 .p-tl { grid-area: 1 / 1; } .p-tc { grid-area: 1 / 2; } .p-tr { grid-area: 1 / 3; }
 .p-ml { grid-area: 2 / 1; } .p-mc { grid-area: 2 / 2; } .p-mr { grid-area: 2 / 3; }
@@ -239,26 +276,27 @@ input[type="number"], input[type="text"] {
 /* ===== 首頁卡片 ===== */
 .home-card {
   background: var(--panel);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
   padding: 22px;
   width: min(360px, 90vw);
   margin: 14px auto;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  box-shadow: var(--shadow-card);
   text-align: left;
 }
-label.block { display: block; color: var(--muted); font-size: .9rem; margin-bottom: 14px; }
+label.block { display: block; color: var(--muted); font-size: var(--fs-sm); margin-bottom: 14px; }
 label.block input { display: block; width: 100%; margin-top: 6px; }
 .home-actions { display: flex; gap: 10px; }
 .home-actions button, .home-card > button { width: 100%; }
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); margin: 16px 0; }
-.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
-.error { color: #ff8a8a; min-height: 1.2em; margin: 8px 0 0; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-line); }
+.error { color: var(--danger-text); min-height: 1.2em; margin: 8px 0 0; }
 /* toast 提示:依語意分色的小膠囊(空時不顯示底色;成功/資訊/錯誤各一色) */
-#toast { min-height: 1.2em; margin: 8px 0 0; display: inline-block; border-radius: 999px; font-weight: 600; font-size: .9rem; transition: opacity .2s ease; }
+#toast { margin: 8px 0 0; display: inline-block; border-radius: var(--r-pill); font-weight: 600; font-size: var(--fs-sm); transition: opacity .2s ease; }
+#toast:empty { display: none; margin: 0; } /* 沒訊息時完全收合,不在 room-top 下方留空白 */
 #toast.toast-show { padding: 6px 14px; }
-#toast.toast-error { background: rgba(226,59,59,0.18); color: #ff8a8a; border: 1px solid rgba(226,59,59,0.45); }
-#toast.toast-success { background: rgba(84,224,138,0.16); color: #54e08a; border: 1px solid rgba(84,224,138,0.45); }
+#toast.toast-error { background: rgba(226,59,59,0.18); color: var(--danger-text); border: 1px solid rgba(226,59,59,0.45); }
+#toast.toast-success { background: rgba(84,224,138,0.16); color: var(--success); border: 1px solid rgba(84,224,138,0.45); }
 #toast.toast-info { background: rgba(77,208,255,0.16); color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); }
 
 /* ===== 房間版面 ===== */
@@ -275,17 +313,17 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
 }
 .room-top {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 16px; background: var(--panel); border-radius: 12px; margin-bottom: 12px;
+  padding: 12px 16px; background: var(--panel); border-radius: var(--r-md); margin-bottom: 12px;
 }
-.room-code strong { font-size: 1.4rem; letter-spacing: 3px; color: var(--accent); }
+.room-code strong { font-size: var(--fs-lg); letter-spacing: 3px; color: var(--accent); }
 button.mini { padding: 6px 12px; font-size: .85rem; }
 .top-actions { display: flex; gap: 8px; align-items: center; }
-button.danger { background: #e23b3b; color: #fff; }
+button.danger { background: var(--danger); color: #fff; }
 button.danger:hover { filter: brightness(1.08); }
-.badge { background: var(--accent2); color: #00222e; font-weight: 700; padding: 6px 12px; border-radius: 999px; font-size: .85rem; }
-.banner { background: rgba(77,208,255,0.12); border: 1px solid rgba(77,208,255,0.3); color: var(--text); padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; text-align: center; }
+.badge { background: var(--accent2); color: var(--on-accent2); font-weight: 700; padding: 6px 12px; border-radius: var(--r-pill); font-size: .85rem; }
+.banner { background: rgba(77,208,255,0.12); border: 1px solid rgba(77,208,255,0.3); color: var(--text); padding: 12px 16px; border-radius: var(--r-md); margin-bottom: 12px; text-align: center; }
 .banner strong { color: var(--accent); }
-.panel { background: var(--panel); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.panel { background: var(--panel); border-radius: var(--r-md); padding: 16px; margin-bottom: 12px; }
 /* 動作面板高度固定,避免各階段切換時版面上下跳動;內容置中 */
 #controls { min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 #controls p { margin: 0; } /* 去掉 <p> 預設上下margin,避免文字版比按鈕版更高 */
@@ -306,7 +344,7 @@ button.danger:hover { filter: brightness(1.08); }
 .roster-collapse { display: block; margin: 0 0 8px auto; }
 .roster-open {
   position: fixed; right: 12px; bottom: 12px; z-index: 26;
-  padding: 8px 14px; font-size: .9rem;
+  padding: 8px 14px; font-size: var(--fs-sm);
 }
 @media (max-width: 600px) {
   .roster-float { width: min(266px, 92vw); max-height: 56vh; }
@@ -316,9 +354,9 @@ button.danger:hover { filter: brightness(1.08); }
 @media (max-width: 600px) {
   .room-wrap { padding: 10px; }
   .room-top { padding: 8px 10px; margin-bottom: 8px; gap: 8px; }
-  .room-code strong { font-size: 1.1rem; letter-spacing: 2px; }
-  button.mini { padding: 5px 9px; font-size: .8rem; }
-  .badge { padding: 5px 10px; font-size: .8rem; }
+  .room-code strong { font-size: var(--fs-md); letter-spacing: 2px; }
+  button.mini { padding: 5px 9px; font-size: var(--fs-xs); }
+  .badge { padding: 5px 10px; font-size: var(--fs-xs); }
   .banner { padding: 8px 10px; margin-bottom: 8px; }
   .panel { padding: 10px; margin-bottom: 8px; }
   /* 手機:隱藏「目前模式」徽章,減少 header 擁擠 */
@@ -328,19 +366,19 @@ button.danger:hover { filter: brightness(1.08); }
 .lobby-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .lobby-row .label { color: var(--muted); min-width: 78px; }
 .mode-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip { background: #0c0f22; color: var(--text); border: 1px solid rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 999px; transition: border-color .15s ease, background .15s ease; }
+.chip { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); padding: 8px 14px; border-radius: var(--r-pill); transition: border-color .15s ease, background .15s ease; }
 .chip:not(.active):hover { border-color: var(--accent); background: rgba(255,204,77,0.08); }
-.chip.active { background: var(--accent); color: #1a1300; border-color: var(--accent); }
+.chip.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* 玩家格採彈性置中換行:人數少不會被拉寬、不留空欄,同一列等高 */
 #board { min-height: 200px; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 14px; }
-.board-cell { flex: 1 1 190px; max-width: 260px; min-width: 150px; background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px 14px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+.board-cell { flex: 1 1 190px; max-width: 260px; min-width: 150px; background: var(--panel); border: 1px solid var(--border-faint); border-radius: var(--r-lg); padding: 16px 14px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
 /* 只顯示自己時(吹牛骰抓之前):單一格置中加寬,骰子橫向鋪開 */
 #board.solo .board-cell { flex-basis: 100%; max-width: 480px; }
 /* 自己的格子:換背景色 + 青色細邊(外框 box-shadow 另有用途,故用 border) */
 .board-cell.mine { background: linear-gradient(160deg, #34406f, #3a3170); border-color: rgba(77,208,255,0.5); }
 /* 話胚:牌型最小的玩家(可重骰/認輸)→ 紅框(偏負面:快輸了) */
-.board-cell.lowest { box-shadow: 0 0 0 3px #ff5d6c; }
+.board-cell.lowest { box-shadow: 0 0 0 3px var(--lose); }
 /* 正在等待此玩家做決定(選玩法 / 選條件)→ 青色呼吸光暈(中性聚焦,與「最小者」紅框區隔) */
 .board-cell.deciding { box-shadow: 0 0 0 3px var(--accent2); animation: turnPulse 1.4s ease-in-out infinite; }
 @keyframes turnPulse { 0%,100% { box-shadow: 0 0 0 3px var(--accent2); } 50% { box-shadow: 0 0 0 6px rgba(77,208,255,0.35); } }
@@ -349,53 +387,51 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .loser-popup .loser-card {
   pointer-events: auto; /* 卡片本身可接收點擊(點卡片不關;點外面才關) */
-  text-align: center; padding: 24px 36px; border-radius: 18px;
-  background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid #ff5d6c;
+  text-align: center; padding: 24px 36px; border-radius: var(--r-lg);
+  background: linear-gradient(135deg, #2a0d12, #3a1020); border: 2px solid var(--lose);
   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 9999px rgba(0,0,0,0.28);
   animation: loserPop .3s cubic-bezier(.2,.9,.3,1.25);
 }
 @keyframes loserPop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.loser-popup .loser-title { font-size: 1.1rem; letter-spacing: 3px; color: #ffd0d6; margin-bottom: 4px; }
-.loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: #ff5d6c; line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
-.loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: #ffd0d6; }
-.loser-popup .loser-hint { margin-top: 10px; font-size: .8rem; }
+.loser-popup .loser-title { font-size: var(--fs-md); letter-spacing: 3px; color: var(--lose-text); margin-bottom: 4px; }
+.loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: var(--lose); line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
+.loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: var(--lose-text); }
+.loser-popup .loser-hint { margin-top: 10px; font-size: var(--fs-xs); }
 /* 話胚:牌型大小順序(一橫排,精簡) */
 /* 話胚牌型提示:ℹ️ 按鈕浮動固定在左下角,完全不佔版面流、不擠棋盤 */
 .poker-guide { position: fixed; left: 12px; bottom: 12px; z-index: 25; background: none; padding: 0; margin: 0; }
 .poker-guide .chip { font-size: .85rem; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
 /* 牌型大小 popup(點 ℹ️ 展開) */
 .rank-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
-.rank-popup .rank-card { background: var(--panel); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 18px 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); max-width: 90vw; }
+.rank-popup .rank-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); max-width: 90vw; }
 .rank-popup .rank-card h3 { margin: 0 0 10px; font-size: 1.05rem; }
 .rank-popup .rank-list { margin: 0; padding-left: 1.4em; line-height: 1.8; }
 .rank-popup .rank-list b { color: var(--accent); }
 /* 吹牛開盅各點數統計 popup */
 .stats-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .stats-popup .stats-card {
-  pointer-events: auto; text-align: center; padding: 20px 26px; border-radius: 16px;
+  pointer-events: auto; text-align: center; padding: 20px 26px; border-radius: var(--r-lg);
   background: var(--panel); border: 2px solid var(--accent2);
   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 9999px rgba(0,0,0,0.3);
   animation: loserPop .3s cubic-bezier(.2,.9,.3,1.25);
 }
-.stats-popup .stats-title { font-size: 1.1rem; color: var(--accent2); margin-bottom: 12px; }
+.stats-popup .stats-title { font-size: var(--fs-md); color: var(--accent2); margin-bottom: 12px; }
 .stats-popup .stats-grid { display: grid; grid-template-columns: repeat(3, auto); gap: 8px 18px; justify-content: center; }
 .stats-popup .stat-cell { font-size: 1.3rem; font-weight: 700; }
 .stats-popup .stat-cell b { font-size: 1.5rem; font-weight: 400; }
 /* 話胚:可點選鎖定的骰子 */
 .die3d-scene.lockable { cursor: pointer; }
-/* 被鎖定的骰子:灰色外框 + 中央鎖頭 icon(重骰時點數不變) */
-.die3d-scene.locked { outline: 3px solid #9aa0b5; outline-offset: 3px; border-radius: 6px; }
+/* 被鎖定的骰子:琥珀外框 + 右上角鎖頭(移出中央 → 點數完整可見、鎖頭也清楚) */
+.die3d-scene.locked { outline: 3px solid var(--lock); outline-offset: 3px; border-radius: var(--r-sm); }
 .die3d-scene.locked::before {
   content: '🔒';
   position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.5rem;
+  top: -10px; right: -10px;   /* 移到右上角,不蓋住點數 */
+  font-size: 1.05rem;
   line-height: 1;
   z-index: 10;
   pointer-events: none;
-  opacity: 0.4;          /* 半透明,讓點數透出來 */
-  filter: grayscale(1);  /* 去色 → 單色鎖頭 */
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); /* 清楚可見、不再半透明去色 */
 }
 .cell-name { font-weight: 700; margin-bottom: 8px; }
 .dice-stage { min-height: 90px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; perspective: 700px; }
@@ -405,33 +441,33 @@ button.danger:hover { filter: brightness(1.08); }
 .pip-stat { display: inline-block; margin: 0 5px; white-space: nowrap; }
 .pip-stat b { font-size: 1.15em; font-weight: 400; }
 /* 純搖骰:總和做成藥丸標籤;領先者再加金色 */
-.sum-pill { display: inline-block; padding: 3px 12px; border-radius: 999px; background: #0c0f22; border: 1px solid rgba(255,255,255,0.12); font-weight: 700; }
-.sum-pill.lead { background: var(--accent); color: #1a1300; border-color: var(--accent); }
-.waiting { color: var(--muted); font-size: .9rem; }
-.cup { width: 56px; height: 56px; border-radius: 10px; background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: #e23b3b; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
+.sum-pill { display: inline-block; padding: 3px 12px; border-radius: var(--r-pill); background: var(--input-bg); border: 1px solid var(--border-line); font-weight: 700; }
+.sum-pill.lead { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.waiting { color: var(--muted); font-size: var(--fs-sm); }
+.cup { width: 56px; height: 56px; border-radius: var(--r-sm); background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: var(--danger); border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
 
 .center-pad { padding: 40px; text-align: center; }
 .roster { list-style: none; padding: 0; margin: 0 0 8px; }
 .roster li { padding: 6px 0; display: flex; align-items: center; gap: 8px; }
 .roster .pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-actions { margin-left: auto; flex-shrink: 0; display: flex; gap: 6px; }
-.kick { background: transparent; color: #ff8a8a; border: 1px solid rgba(255,138,138,0.4); padding: 1px 8px; border-radius: 6px; font-size: .8rem; font-weight: 700; line-height: 1.4; }
+.kick { background: transparent; color: var(--danger-text); border: 1px solid rgba(255,138,138,0.4); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700; line-height: 1.4; }
 .kick:hover { background: rgba(255,138,138,0.15); filter: none; }
-.mkhost { background: transparent; color: var(--accent); border: 1px solid rgba(255,204,77,0.45); padding: 1px 8px; border-radius: 6px; font-size: .8rem; line-height: 1.4; }
+.mkhost { background: transparent; color: var(--accent); border: 1px solid rgba(255,204,77,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; }
 .mkhost:hover { background: rgba(255,204,77,0.15); filter: none; }
-.bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: 6px; font-size: .8rem; line-height: 1.4; }
+.bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; }
 .bench:hover { background: rgba(77,208,255,0.15); filter: none; }
-.roster h3, #roster h3 { margin: 6px 0; font-size: 1rem; }
+.roster h3, #roster h3 { margin: 6px 0; font-size: var(--fs-base); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.roster .crown { font-size: 1rem; line-height: 1; flex-shrink: 0; }
-.dot.on { background: #54e08a; }
-.dot.off { background: #6a7099; }
+.roster .crown { font-size: var(--fs-base); line-height: 1; flex-shrink: 0; }
+.dot.on { background: var(--success); }
+.dot.off { background: var(--offline); }
 .bid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 /* 等待訊息中的玩家名稱highlight */
 .hl { color: var(--accent); font-weight: 700; }
-.auto-next, .auto-roll { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .9rem; cursor: pointer; }
+.auto-next, .auto-roll { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
 .auto-next input, .auto-roll input { cursor: pointer; }
-select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 1rem; }
+select { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-base); }
 
 /* 房間內骰子縮小一點 */
 .dice-stage .die3d-scene, .dice-stage .die3d { width: 56px; height: 56px; }
@@ -469,9 +505,9 @@ select { background: #0c0f22; border: 1px solid rgba(255,255,255,0.15); color: v
   .dice-stage .f4 { transform: rotateY(-90deg) translateZ(17px); }
   .dice-stage .f2 { transform: rotateX(90deg)  translateZ(17px); }
   .dice-stage .f5 { transform: rotateX(-90deg) translateZ(17px); }
-  .die3d-scene.locked::before { font-size: 1rem; }
+  .die3d-scene.locked::before { font-size: .85rem; top: -7px; right: -7px; }
   .cup { width: 34px; height: 34px; font-size: 1rem; border-radius: 6px; }
-  .sum-pill { padding: 2px 8px; font-size: .8rem; }
+  .sum-pill { padding: 2px 8px; font-size: var(--fs-xs); }
 }
 
 /* 尊重系統「減少動態效果」設定:關閉動畫/過場(前庭敏感友善) */

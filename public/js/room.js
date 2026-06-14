@@ -174,6 +174,7 @@ function render() {
   renderPokerGuide();
   if (!pokerRerollAnim) renderLoserBanner(); // 重骰動畫期間先別跳輸家公告(等動畫停再顯示)
   renderBluffStats();
+  updateBarMetric(); // 量測底部動作條高度 → 浮動鈕/棋盤留白貼齊(手機直向)
   maybeAutoNext();
 
   // 輪到我搖骰(各模式 rolling 階段、含紅黑單雙「搖下一骰」)→ 提示音(同話胚)
@@ -183,6 +184,18 @@ function render() {
   if (!needRoll) autoRolling = false; // 已不需搖骰 → 解除自動骰鎖
   if (needRoll && autoRoll) maybeAutoRoll();
 }
+
+// 手機直向:量測底部固定動作條的實際高度,寫入 --controls-h,讓棋盤留白與浮動鈕剛好貼齊
+const barMQ = window.matchMedia('(max-width: 600px) and (orientation: portrait)');
+function updateBarMetric() {
+  const el = $('controls');
+  const active = barMQ.matches && el && el.style.display !== 'none'
+    && document.body.classList.contains('has-bottom-controls');
+  const h = active ? el.offsetHeight : 0;
+  document.documentElement.style.setProperty('--controls-h', h + 'px');
+}
+window.addEventListener('resize', updateBarMetric);
+window.addEventListener('orientationchange', updateBarMetric);
 
 // 目前是否「換我搖骰」(在進行中、非觀戰、rolling 階段且我還沒搖)
 function iNeedToRoll() {
@@ -732,6 +745,8 @@ function renderBoard() {
 function renderControls() {
   const el = $('controls');
   const g = state.game;
+  // 預設視為「有動作條內容」(手機直向會把 #controls 固定到底部);房主大廳分支會關掉
+  document.body.classList.add('has-bottom-controls');
   if (state.you.isAway) {
     el.style.display = '';
     el.innerHTML = '<p class="muted">💤 你被移到暫離觀戰區</p>'
@@ -749,6 +764,7 @@ function renderControls() {
     if (state.you.isHost) {
       el.style.display = 'none';
       el.innerHTML = '';
+      document.body.classList.remove('has-bottom-controls'); // 房主大廳:無動作條
     } else {
       const h = state.players.find((p) => p.id === state.hostId);
       el.style.display = '';
@@ -946,6 +962,15 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => { if (isSpace(e)) releaseRoll(); });
 
 // ---- 頂部按鈕 ----
+// 手機直向:☰ 切換 room-top 動作下拉選單;點選單外自動收起
+$('menuToggle')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.querySelector('.room-top')?.classList.toggle('menu-open');
+});
+document.addEventListener('click', (e) => {
+  const rt = document.querySelector('.room-top');
+  if (rt && rt.classList.contains('menu-open') && !e.target.closest('.room-top')) rt.classList.remove('menu-open');
+});
 $('copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(code); toast('已複製房號 ' + code, 'success'); }
   catch { toast('房號:' + code, 'info'); }

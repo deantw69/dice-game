@@ -318,6 +318,7 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
 .room-code strong { font-size: var(--fs-lg); letter-spacing: 3px; color: var(--accent); }
 button.mini { padding: 6px 12px; font-size: .85rem; }
 .top-actions { display: flex; gap: 8px; align-items: center; }
+.menu-toggle { display: none; } /* ☰ 選單鈕:僅手機直向顯示(把 top-actions 收進下拉) */
 button.danger { background: var(--danger); color: #fff; }
 button.danger:hover { filter: brightness(1.08); }
 .badge { background: var(--accent2); color: var(--on-accent2); font-weight: 700; padding: 6px 12px; border-radius: var(--r-pill); font-size: .85rem; }
@@ -508,6 +509,40 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
   .die3d-scene.locked::before { font-size: .85rem; top: -7px; right: -7px; }
   .cup { width: 34px; height: 34px; font-size: 1rem; border-radius: 6px; }
   .sum-pill { padding: 2px 8px; font-size: var(--fs-xs); }
+}
+
+/* 手機直向:上半部不釘頂(隨頁面捲動,把高度還給棋盤),動作控制改為固定在畫面最底的動作條 */
+@media (max-width: 600px) and (orientation: portrait) {
+  .room-sticky { position: static; box-shadow: none; }
+  /* room-top 精簡:只留房號 + ☰,其餘動作收進點 ☰ 展開的下拉選單 */
+  .menu-toggle { display: inline-flex; }
+  .room-top { position: relative; flex-wrap: nowrap; }
+  .top-actions {
+    display: none;
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+    flex-direction: column; align-items: stretch; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--r-md); padding: 12px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+    min-width: 190px;
+  }
+  .room-top.menu-open .top-actions { display: flex; }
+  .top-actions .auto-next, .top-actions .auto-roll { font-size: var(--fs-base); }
+  /* 擲骰/重骰/抓 等動作:固定在底部動作條 → 始終可見、也好用拇指按 */
+  #controls {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    min-height: 0; margin: 0; border-radius: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.4);
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+  /* 有動作條時:棋盤底部留白、浮動鈕貼著動作條上緣(高度由 JS 量測寫入 --controls-h,
+     不論動作條多高都剛好貼齊,不會多留空隙) */
+  body.has-bottom-controls #board { padding-bottom: calc(var(--controls-h, 64px) + 16px); }
+  body.has-bottom-controls .poker-guide,
+  body.has-bottom-controls .roster-open,
+  body.has-bottom-controls .roster-float { bottom: calc(var(--controls-h, 64px) + 8px); }
 }
 
 /* 尊重系統「減少動態效果」設定:關閉動畫/過場(前庭敏感友善) */

@@ -544,12 +544,3 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
   body.has-bottom-controls .roster-open,
   body.has-bottom-controls .roster-float { bottom: calc(var(--controls-h, 64px) + 8px); }
 }
-
-/* 尊重系統「減少動態效果」設定:關閉動畫/過場(前庭敏感友善) */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-  }
-}

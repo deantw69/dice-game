@@ -106,6 +106,19 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  // 房主手動排序玩家(只在大廳;開局後順序已鎖進回合)
+  socket.on('reorderPlayers', ({ order } = {}, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能調整順序' });
+    if (room.status !== 'lobby') return cb?.({ error: '遊戲進行中無法調整順序' });
+    const res = rm.reorderPlayers(room, order);
+    if (res.error) return cb?.({ error: res.error });
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   socket.on('setAutoRotate', ({ on }, cb) => {
     const room = rm.findRoomBySocket(socket.id);
     if (!room) return cb?.({ error: '尚未加入房間' });

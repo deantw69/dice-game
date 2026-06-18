@@ -165,6 +165,19 @@ export function imBack(room, playerId) {
   return { room, player: pl };
 }
 
+// 房主手動指定玩家順序;orderedIds 必須是現有 players 的合法重排(同一組 id、不多不少)
+export function reorderPlayers(room, orderedIds) {
+  if (!Array.isArray(orderedIds)) return { error: '順序格式錯誤' };
+  const cur = room.players.map((p) => p.id);
+  if (orderedIds.length !== cur.length) return { error: '順序不完整' };
+  const want = new Set(orderedIds);
+  if (want.size !== orderedIds.length) return { error: '順序有重複' };
+  if (!cur.every((id) => want.has(id))) return { error: '順序與玩家不符' };
+  const byId = new Map(room.players.map((p) => [p.id, p]));
+  room.players = orderedIds.map((id) => byId.get(id));
+  return { room };
+}
+
 // 隨機打亂玩家順序(Fisher-Yates)
 export function shufflePlayers(room) {
   const a = room.players;

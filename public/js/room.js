@@ -352,11 +352,21 @@ function renderRoster() {
       : '';
     return `<li>${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
   };
+  // 房主在大廳可手動調整玩家順序(▲▼);開局後順序鎖定,不顯示
+  const canReorder = state.you.isHost && state.status === 'lobby' && state.players.length > 1;
   let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
   // 玩家列表固定用加入順序(state.players 原始順序:房主先、之後依加入先後)
-  html += state.players.map((p) => {
+  html += state.players.map((p, i) => {
     const losses = (state.losses && state.losses[p.id]) || 0;
-    const extra = ` <span class="muted">輸 ${losses} 次</span>`;
+    let extra = ` <span class="muted">輸 ${losses} 次</span>`;
+    if (canReorder) {
+      const up = i > 0 ? `data-up="${p.id}"` : 'disabled';
+      const down = i < state.players.length - 1 ? `data-down="${p.id}"` : 'disabled';
+      extra += `<span class="row-order">`
+        + `<button class="ord" ${up} title="上移">▲</button>`
+        + `<button class="ord" ${down} title="下移">▼</button>`
+        + `</span>`;
+    }
     return playerRow(p, extra, { bench: true });
   }).join('');
   html += '</ul>';
@@ -387,6 +397,21 @@ function renderRoster() {
     b.addEventListener('click', () => {
       if (confirm('確定把房主轉移給此玩家嗎?')) act('transferHost', { targetId: b.dataset.host });
     })
+  );
+  // 房主:上下移動調整玩家順序(送出完整新順序陣列)
+  const movePlayer = (id, dir) => {
+    const order = state.players.map((p) => p.id);
+    const i = order.indexOf(id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    act('reorderPlayers', { order });
+  };
+  el.querySelectorAll('[data-up]').forEach((b) =>
+    b.addEventListener('click', () => movePlayer(b.dataset.up, -1))
+  );
+  el.querySelectorAll('[data-down]').forEach((b) =>
+    b.addEventListener('click', () => movePlayer(b.dataset.down, 1))
   );
 }
 

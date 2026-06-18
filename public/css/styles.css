@@ -336,7 +336,9 @@ button.danger:hover { filter: brightness(1.08); }
 /* 懸浮玩家列表:右下角固定,有自己的捲動,不隨棋盤捲動;可收進右側 */
 .roster-float {
   position: fixed; right: 12px; bottom: 12px;
-  width: 308px; max-height: 62vh; overflow-y: auto;
+  /* 依內容(房主按鈕多寡 / 名稱長短)動態撐寬,但有下限與上限 */
+  width: fit-content; min-width: 308px; max-width: min(460px, 90vw);
+  max-height: 62vh; overflow-y: auto;
   z-index: 25;
   box-shadow: 0 14px 34px rgba(0,0,0,0.55);
   transition: transform .28s ease, opacity .28s ease;
@@ -348,7 +350,7 @@ button.danger:hover { filter: brightness(1.08); }
   padding: 8px 14px; font-size: var(--fs-sm);
 }
 @media (max-width: 600px) {
-  .roster-float { width: min(266px, 92vw); max-height: 56vh; }
+  .roster-float { width: fit-content; min-width: min(266px, 92vw); max-width: 92vw; max-height: 56vh; }
 }
 
 /* 手機優化:精簡上半部(header/banner/控制)的 padding 與間距,讓上半部變矮 */
@@ -458,6 +460,14 @@ button.danger:hover { filter: brightness(1.08); }
 .mkhost:hover { background: rgba(255,204,77,0.15); filter: none; }
 .bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; }
 .bench:hover { background: rgba(77,208,255,0.15); filter: none; }
+.row-order { display: inline-flex; gap: 4px; margin-left: 6px; flex-shrink: 0; }
+.ord {
+  background: transparent; color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 2px 9px; font-size: var(--fs-sm); line-height: 1.2;
+  min-width: 32px; min-height: 30px; touch-action: manipulation;
+}
+.ord:hover { background: rgba(255,255,255,0.08); filter: none; }
+.ord:disabled { opacity: 0.3; }
 .roster h3, #roster h3 { margin: 6px 0; font-size: var(--fs-base); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .roster .crown { font-size: var(--fs-base); line-height: 1; flex-shrink: 0; }

@@ -17,9 +17,14 @@ const myId = session.playerId;
 const diceCache = new Map(); // cellKey -> { renderer, last }
 const rollSettled = {};      // 純搖骰:pid -> 已落定(動畫結束)的點數簽章,落定後才顯示總和
 const rollPending = {};      // 純搖骰:pid -> 已排定延遲顯示的點數簽章(避免重複排程)
+const lossSettled = {};      // pid -> 已落定的輸次數(骰子動畫結束後才顯示新值)
+const lossPending = {};      // pid -> 待落定的輸次數簽章(避免重複排程)
 let pokerStaticDone = false; // 話胚:初次「一次開全部牌」用靜態,之後重骰點數變動才滾動
 let lastRollSeq = 0;          // 話胚:已處理的重骰序號(用來觸發「該次重骰」的滾動動畫)
 let pokerRerollAnim = false;  // 話胚:重骰動畫進行中 → 延後「最小者切換/控制/橫幅」等結果
+let prevStatus = null;        // 上次 render 時的 status(用來偵測 playing→lobby 轉換)
+let roundEndAnim = false;     // 回合結束動畫進行中 → 延後顯示大廳順序按鈕等結果 UI
+let roundEndTimer = null;
 let pokerRerollTimer = null;
 let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
 let wasNeedRoll = false;      // 上次 render 時我是否需要搖骰(用來在「剛輪到我搖骰」時播提示音)
@@ -165,6 +170,14 @@ function render() {
     if (pokerRerollTimer) clearTimeout(pokerRerollTimer);
     pokerRerollTimer = setTimeout(() => { pokerRerollAnim = false; render(); }, 1450);
   }
+
+  // 回合結束(playing→lobby):骰子動畫還在跑,延後 1.5s 才顯示順序按鈕等大廳結果 UI
+  if (prevStatus === 'playing' && state.status === 'lobby') {
+    roundEndAnim = true;
+    if (roundEndTimer) clearTimeout(roundEndTimer);
+    roundEndTimer = setTimeout(() => { roundEndAnim = false; if (state) render(); }, 1500);
+  }
+  prevStatus = state.status;
 
   renderRoster();
   if (!pokerRerollAnim) renderLobby();    // 重骰動畫期間保留前一畫面(避免輸家骰子還沒停 lobby 就跳出)
@@ -353,11 +366,18 @@ function renderRoster() {
     return `<li>${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
   };
   // 房主在大廳可手動調整玩家順序(▲▼);開局後順序鎖定,不顯示
-  const canReorder = state.you.isHost && state.status === 'lobby' && state.players.length > 1;
+  const canReorder = !roundEndAnim && state.you.isHost && state.status === 'lobby' && state.players.length > 1;
   let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
   // 玩家列表固定用加入順序(state.players 原始順序:房主先、之後依加入先後)
   html += state.players.map((p, i) => {
-    const losses = (state.losses && state.losses[p.id]) || 0;
+    const serverLosses = (state.losses && state.losses[p.id]) || 0;
+    if (lossSettled[p.id] === undefined) lossSettled[p.id] = serverLosses;
+    const lossSig = String(serverLosses);
+    if (lossSettled[p.id] !== serverLosses && lossPending[p.id] !== lossSig) {
+      lossPending[p.id] = lossSig;
+      setTimeout(() => { lossSettled[p.id] = serverLosses; lossPending[p.id] = null; if (state) render(); }, 1500);
+    }
+    const losses = lossSettled[p.id];
     let extra = ` <span class="muted">輸 ${losses} 次</span>`;
     if (canReorder) {
       const up = i > 0 ? `data-up="${p.id}"` : 'disabled';

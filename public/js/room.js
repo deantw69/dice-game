@@ -1,6 +1,7 @@
 // 房間 UI 與 socket 事件繫結
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
+import { createRenderer as createCup } from './dice/diceCup.js';
 import { playAlert, playFanfare, playRattle } from './dice/cupSound.js';
 
 const $ = (id) => document.getElementById(id);
@@ -15,6 +16,7 @@ if (!session || !session.playerId || session.code !== code) {
 let state = null;            // 最新 roomState
 const myId = session.playerId;
 const diceCache = new Map(); // cellKey -> { renderer, last }
+const cupCache = new Map();  // 吹牛骰「抓」之前自己骰子用的骰盅渲染器 cellKey -> { renderer, el, count, revealedSig }
 const rollSettled = {};      // 純搖骰:pid -> 已落定(動畫結束)的點數簽章,落定後才顯示總和
 const rollPending = {};      // 純搖骰:pid -> 已排定延遲顯示的點數簽章(避免重複排程)
 const lossSettled = {};      // pid -> 已落定的輸次數(骰子動畫結束後才顯示新值)
@@ -89,6 +91,8 @@ function showDice(container, key, values, hidden = false, staticShow = false, ro
     diceCache.delete(key);
     return;
   }
+  // 若這個 stage 之前是骰盅(吹牛骰 solo),先清掉盅 DOM 與快取,改建 CSS3D 骰子
+  if (container.querySelector('.cup-scene')) { container.innerHTML = ''; container.classList.remove('cup-cell'); diceCache.delete(key); }
   let entry = diceCache.get(key);
   if (!entry || entry.el !== container || entry.count !== values.length) {
     container.innerHTML = '';
@@ -109,6 +113,28 @@ function showDice(container, key, values, hidden = false, staticShow = false, ro
   }
   // 清除上一輪開牌的叉叉(reveal 時會由 markRemovedDice 重新標記)
   container.querySelectorAll('.die3d-scene.marked').forEach((s) => s.classList.remove('marked'));
+}
+
+// 吹牛骰「抓」之前:自己的骰子用骰盅(木紋/上掀,demo #2)蓋著搖、掀蓋亮點。
+// 取得/建立該 stage 的骰盅渲染器(數量改變或盅 DOM 已被換掉時重建)。
+function getCup(stage, key, count) {
+  const n = Math.max(1, count || 1);
+  let entry = cupCache.get(key);
+  if (!entry || entry.el !== stage || entry.count !== n || !stage.querySelector('.cup-scene')) {
+    stage.innerHTML = '';
+    stage.classList.add('cup-cell');
+    diceCache.delete(key); // 同一格若曾是 CSS3D 骰子,清掉避免混用
+    const renderer = createCup(stage, { count: n, style: 'wood', lift: 'up', sound: false });
+    entry = { renderer, el: stage, count: n, handSig: null, peeked: false };
+    cupCache.set(key, entry);
+  }
+  return entry;
+}
+
+// 目前是否為吹牛骰「抓」之前(只顯示自己骰子的 solo 階段)
+function isLiarsSolo() {
+  const g = state && state.game;
+  return !!(g && g.mode === 'liars' && !g.reveal);
 }
 
 // 開牌時在「要被拿掉」的骰子上畫叉叉(索引由後端 reveal.removedIdx 提供,前端不再自算條件)
@@ -751,21 +777,43 @@ function renderBoard() {
     } else if (g.mode === 'liars') {
       const reveal = g.reveal;
       if (reveal) {
+        // 開盅:所有人靜態亮點數(CSS3D,無動畫)
         if (reveal.hands[p.id]) {
-          showDice(stage, 'cell-' + p.id, reveal.hands[p.id], false, true); // 開盅:靜態亮點數(無動畫)
+          showDice(stage, 'cell-' + p.id, reveal.hands[p.id], false, true);
           info.innerHTML = pipCountSummary(reveal.hands[p.id]);             // 開盅後:各家點數統計
         } else {
           stage.innerHTML = '<div class="waiting">未搖骰</div>';
           diceCache.delete('cell-' + p.id);
           info.textContent = '';
         }
-      } else if (g.myDice && g.myDice.length) {
-        showDice(stage, 'cell-' + p.id, g.myDice);           // 抓之前:只顯示自己的
-        info.innerHTML = pipCountSummary(g.myDice);          // 開牌前:自己的點數統計
       } else {
-        stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
-        diceCache.delete('cell-' + p.id);
-        info.textContent = '';
+        // 抓之前:只有自己這格,用骰盅(蓋著待命 → 搖完掀蓋亮自己的點)
+        const count = (g.myDice && g.myDice.length) ? g.myDice.length : (g.diceLeft ? (g.diceLeft[p.id] || 0) : 0);
+        const cup = getCup(stage, 'cell-' + p.id, count);
+        if (g.myDice && g.myDice.length) {
+          const sig = g.myDice.join(',');
+          if (cup.handSig !== sig) {                 // 新的一手:首次掀蓋動畫
+            cup.handSig = sig; cup.peeked = false;
+            cup.renderer.reveal(g.myDice);
+          } else if (cup.peeked) {                   // 使用者把盅蓋回去了
+            cup.renderer.cover();
+          } else {
+            cup.renderer.setStatic(g.myDice);        // 純重繪 / 再打開:不重播翻滾
+          }
+          info.innerHTML = pipCountSummary(g.myDice);          // 自己的點數統計
+          // 開盅後:點骰子區域可暫時蓋回 / 再打開(反覆),純前端視覺
+          stage.style.cursor = 'pointer';
+          stage.title = '點一下蓋回 / 打開';
+          stage.onclick = () => {
+            cup.peeked = !cup.peeked;
+            if (cup.peeked) cup.renderer.cover(); else cup.renderer.setStatic(g.myDice);
+          };
+        } else {
+          cup.renderer.cover();        // 尚未搖:盅蓋著待命
+          cup.handSig = null; cup.peeked = false;
+          stage.onclick = null; stage.style.cursor = ''; stage.title = '';
+          info.textContent = '';
+        }
       }
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
@@ -1020,6 +1068,17 @@ function pressRoll(kind = 'roll') {
 
   const count = rollDiceCount();
   if (!stage || !count) return; // 找不到也沒關係,放開時仍會送出
+
+  // 吹牛骰「抓」之前:用骰盅蓋著抖(放開後 renderBoard 收到 myDice 才掀蓋亮點)
+  if (isLiarsSolo()) {
+    const cup = getCup(stage, 'cell-' + myId, count);
+    cup.handSig = null; cup.peeked = false;
+    cup.renderer.shake();
+    playRattle(400);
+    rollSpin.timer = setInterval(() => playRattle(400), 360);
+    return;
+  }
+
   const spin = () => {
     const vals = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 6));
     showDice(stage, 'cell-' + myId, vals); // 連續滾隨機點數

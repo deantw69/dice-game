@@ -49,6 +49,33 @@ export function createRenderer(container, options = {}) {
     dice.setCount(n);
   }
 
+  // ---- 分段控制(供遊戲分階段操作:蓋著待命 → 搖動 → 掀蓋亮點)----
+  // 蓋著待命(尚未搖):盅落下蓋住,無動畫
+  function cover() {
+    vessel.classList.remove('lift');
+    vessel.classList.remove('shake');
+  }
+  // 搖動(蓋著抖):按住搖骰期間持續抖動
+  function shake() {
+    vessel.classList.remove('lift');
+    vessel.classList.add('shake');
+    if (options.sound) playRattle(shakeMs);
+  }
+  // 掀蓋亮點(放開搖骰、拿到結果):停抖、掀蓋、骰子翻滾到點數
+  function reveal(values) {
+    applyFit(values.length);
+    vessel.classList.remove('shake');
+    vessel.classList.add('lift');
+    dice.rollTo(values);
+  }
+  // 靜態(已開過盅、純重繪):直接掀蓋亮點,不重播動畫
+  function setStatic(values) {
+    applyFit(values.length);
+    vessel.classList.remove('shake');
+    vessel.classList.add('lift');
+    dice.setStatic(values);
+  }
+
   const shakeMs = options.shakeMs || 1000; // 搖動(蓋著)時長
   function rollTo(values) {
     applyFit(values.length);
@@ -67,5 +94,5 @@ export function createRenderer(container, options = {}) {
     });
   }
 
-  return { setCount, rollTo, type: 'cup' };
+  return { setCount, rollTo, cover, shake, reveal, setStatic, type: 'cup' };
 }

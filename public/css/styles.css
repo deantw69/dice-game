@@ -207,15 +207,17 @@ input[type="number"], input[type="text"] {
 .cup-tray { --ds: 56px; display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; width: 72%; max-width: 290px; }
 /* 盅內骰子翻滾時間較短(掀蓋後露出來才看得到動) */
 .cup-tray .die3d { transition: transform 0.8s cubic-bezier(.2,.85,.25,1); }
-.cup-tray .die3d-scene, .cup-tray .die3d, .cup-tray .die3d .face { width: var(--ds); height: var(--ds); }
-.cup-tray .die3d .face { padding: calc(var(--ds) * 0.12); border-radius: calc(var(--ds) * 0.17); }
-.cup-tray .die3d .pip { width: calc(var(--ds) * 0.17); height: calc(var(--ds) * 0.17); }
-.cup-tray .f1 { transform: rotateY(0deg)   translateZ(calc(var(--ds) / 2)); }
-.cup-tray .f6 { transform: rotateY(180deg) translateZ(calc(var(--ds) / 2)); }
-.cup-tray .f3 { transform: rotateY(90deg)  translateZ(calc(var(--ds) / 2)); }
-.cup-tray .f4 { transform: rotateY(-90deg) translateZ(calc(var(--ds) / 2)); }
-.cup-tray .f2 { transform: rotateX(90deg)  translateZ(calc(var(--ds) / 2)); }
-.cup-tray .f5 { transform: rotateX(-90deg) translateZ(calc(var(--ds) / 2)); }
+/* 骰子尺寸由 --ds 動態控制(依數量縮放,確保不超出骰盅)。
+   用 .cup-scene 前綴提高特異度,蓋過 .dice-stage 的固定 56px/34px 規則(否則盅內骰子會被鎖死、數量多時凸出盅外) */
+.cup-scene .cup-tray .die3d-scene, .cup-scene .cup-tray .die3d, .cup-scene .cup-tray .die3d .face { width: var(--ds); height: var(--ds); }
+.cup-scene .cup-tray .die3d .face { padding: calc(var(--ds) * 0.12); border-radius: calc(var(--ds) * 0.17); }
+.cup-scene .cup-tray .die3d .pip { width: calc(var(--ds) * 0.17); height: calc(var(--ds) * 0.17); }
+.cup-scene .cup-tray .f1 { transform: rotateY(0deg)   translateZ(calc(var(--ds) / 2)); }
+.cup-scene .cup-tray .f6 { transform: rotateY(180deg) translateZ(calc(var(--ds) / 2)); }
+.cup-scene .cup-tray .f3 { transform: rotateY(90deg)  translateZ(calc(var(--ds) / 2)); }
+.cup-scene .cup-tray .f4 { transform: rotateY(-90deg) translateZ(calc(var(--ds) / 2)); }
+.cup-scene .cup-tray .f2 { transform: rotateX(90deg)  translateZ(calc(var(--ds) / 2)); }
+.cup-scene .cup-tray .f5 { transform: rotateX(-90deg) translateZ(calc(var(--ds) / 2)); }
 
 .cup-vessel {
   position: absolute; left: 50%; bottom: 10px;
@@ -454,6 +456,8 @@ button.danger:hover { filter: brightness(1.08); }
 .dice-stage { min-height: 90px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; perspective: 700px; }
 /* 純搖骰的骰盅版:需要較高空間容納骰盅與掀蓋 */
 .dice-stage.cup-cell { min-height: 200px; align-items: stretch; perspective: none; }
+/* 吹牛骰 solo:只顯示自己骰子 → 把骰盅區域調高;用固定 height 讓骰子確實貼齊底部(同 demo) */
+#board.solo .dice-stage.cup-cell { height: 280px; min-height: 0; }
 .cell-info { margin-top: 8px; }
 .pip-stat { display: inline-block; margin: 0 5px; white-space: nowrap; }
 .pip-stat b { font-size: 1.15em; font-weight: 400; }
@@ -520,6 +524,8 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
   .cell-name { margin-bottom: 4px; font-size: .85rem; }
   .cell-info { margin-top: 4px; font-size: .85rem; }
   .dice-stage { min-height: 54px; gap: 6px; }
+  .dice-stage.cup-cell { min-height: 200px; }
+  #board.solo .dice-stage.cup-cell { height: 345px; min-height: 0; }
   .dice-stage .die3d-scene, .dice-stage .die3d { width: 34px; height: 34px; }
   .dice-stage .die3d .face { width: 34px; height: 34px; padding: 4px; border-radius: 6px; }
   .dice-stage .die3d .pip { width: 5px; height: 5px; }
@@ -530,6 +536,7 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
   .dice-stage .f4 { transform: rotateY(-90deg) translateZ(17px); }
   .dice-stage .f2 { transform: rotateX(90deg)  translateZ(17px); }
   .dice-stage .f5 { transform: rotateX(-90deg) translateZ(17px); }
+  /* 盅內骰子的 --ds 縮放由上方 .cup-scene .cup-tray 規則(較高特異度)統一處理,手機不另外覆寫 */
   .die3d-scene.locked::before { font-size: .85rem; top: -7px; right: -7px; }
   .cup { width: 34px; height: 34px; font-size: 1rem; border-radius: 6px; }
   .sum-pill { padding: 2px 8px; font-size: var(--fs-xs); }

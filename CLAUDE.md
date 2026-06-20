@@ -54,7 +54,7 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 ### 前端(`public/`)
 - `room.js` 是大宗:訂閱 `roomState`,每次收到就整頁 `render()`(roster / banner / board / controls 等)。狀態完全來自伺服器,前端不保留遊戲狀態。
 - `net.js`:Socket.IO 封裝(`emit` 回 Promise)+ session 存取。`app.js`:首頁取暱稱、建房/加房。
-- 骰子渲染器在 `public/js/dice/`,共同介面 `{ setCount, rollTo, setStatic }`(`diceCss3d` 為遊戲實際使用;`diceCup`/`diceThree` 主要用於 `demo.html` 比較)。音效在 `cupSound.js`,全部受 `window.__cupMuted` 控制(遊戲內 🔊 鈕切換)。
+- 骰子渲染器在 `public/js/dice/`,共同介面 `{ setCount, rollTo, setStatic }`(`diceCss3d` 為遊戲主要使用)。`diceCup`(骰盅:蓋住搖→掀蓋)除 `demo.html` 比較外,**吹牛骰「抓」之前的自己骰子視圖**也用它(`room.js` 的 `getCup`),額外提供分段控制 `{ cover, shake, reveal }`:蓋著待命 / 按住搖骰抖動 / 放開拿到 `myDice` 掀蓋亮點(開盅後再點骰子區可反覆蓋回/打開);盅內骰子尺寸由 `--ds` 依數量自動縮放(CSS 規則用 `.cup-scene .cup-tray` 前綴提高特異度,蓋過 `.dice-stage` 的固定尺寸),確保不超出盅。`diceThree` 仍僅用於 `demo.html`。音效在 `cupSound.js`,全部受 `window.__cupMuted` 控制(遊戲內 🔊 鈕切換)。
 - UI 慣例:玩家名稱高亮用 `.hl` class;手機在 `@media (max-width: 600px)` 精簡 header;上半部 `.room-sticky` 釘頂;玩家列表是右下角懸浮面板。
 
 ## 部署

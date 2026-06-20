@@ -124,7 +124,7 @@ export const mixedMode = {
       return { ok: true, chosen: sg.id };
     }
 
-    // 吹牛:抓(開盅)→ 公開所有人骰子 + 各點數統計,開盅即結束本場
+    // 吹牛:抓(開盅)→ 公開所有人骰子 + 各點數統計,進入房主選輸家
     if (action.type === 'grab') {
       if (round.phase !== 'bluffReady') return { error: '現在不能開盅' };
       if (!round.order.every((id) => round.rolled.includes(id))) {
@@ -132,6 +132,21 @@ export const mixedMode = {
       }
       resolveBluff(round, match);
       return { ok: true, revealed: true };
+    }
+
+    // 吹牛:房主選輸家,結束本場
+    if (action.type === 'pickLoser') {
+      if (round.phase !== 'pickLoser') return { error: '現在不能選輸家' };
+      if (player.id !== round.hostId) return { error: '只有房主能選輸家' };
+      const targetId = action.targetId;
+      if (!round.order.includes(targetId)) return { error: '無效的目標玩家' };
+      match.diceLeft[targetId] = Math.max(0, (match.diceLeft[targetId] || 0) - 1);
+      round.reveal.losers = [targetId];
+      round.reveal.loserId = targetId;
+      round.reveal.pending = false;
+      round.phase = 'roundEnd';
+      match.over = true;
+      return { ok: true };
     }
 
     // 話胚:最小的玩家重骰 → 重新比較
@@ -270,22 +285,21 @@ export const mixedMode = {
   },
 };
 
-// 吹牛開盅:統計各點數數量,公開所有骰子;開盅即本場結束 → 回大廳「再來一場」
+// 吹牛開盅:統計各點數數量,公開所有骰子;等房主選輸家後才結束本場
 function resolveBluff(round, match) {
   const stats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const id of round.order) {
     for (const d of round.hands[id] || []) stats[d] = (stats[d] || 0) + 1;
   }
   round.condition = null;
-  round.phase = 'roundEnd';  // 結束本場(不像紅黑會繼續搖下一骰)
-  match.over = true;         // 讓 isMatchOver 判定本場已結束
+  round.phase = 'pickLoser'; // 等房主選輸家後才進 roundEnd
   round.reveal = {
     subGame: 'bluff',
     stats,
-    hands: round.hands, // 開盅:公開所有骰子
-    removed: {},        // 吹牛不拿骰、不淘汰
+    hands: round.hands,
+    removed: {},
     losers: [],
-    pending: false,
+    pending: true, // 等房主選輸家
   };
 }
 

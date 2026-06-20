@@ -234,12 +234,14 @@ function maybeAutoRoll() {
   });
 }
 
-// 本局輸家(話胚:reveal.loserId;紅黑單雙:reveal.losers)
+// 本局輸家(話胚:reveal.loserId;紅黑單雙:reveal.losers;吹牛/吹牛骰:房主選定後)
 function currentLosers() {
   const g = state.game;
   if (!g || !g.reveal) return [];
   if (g.reveal.subGame === 'poker' && g.reveal.loserId) return [g.reveal.loserId];
   if (g.reveal.subGame === 'redblack' && (g.reveal.losers || []).length) return g.reveal.losers;
+  // 吹牛(混合模式)或吹牛骰:房主選定後 pending 變 false 且 losers 有值
+  if (!g.reveal.pending && (g.reveal.losers || []).length) return g.reveal.losers;
   return [];
 }
 
@@ -574,10 +576,14 @@ function renderBanner() {
         ? '👉 換你決定:要拿掉「紅 / 黑 / 單 / 雙 / 大 / 小」哪一種?'
         : `等待 <span class="hl">${nm(g.chooserId)}</span> 決定要拿掉哪一種…`);
     }
+    if (state.status === 'playing' && g.phase === 'pickLoser') {
+      return show(state.you.isHost ? '👇 請選出本輪輸家' : '⏳ 等待房主選出輸家…');
+    }
     if (g.reveal && !g.reveal.pending) {
       const r = g.reveal;
       if (r.subGame === 'bluff') {
-        return show('✊ 開盅! ・ 房主可按「再來一場」'); // 各點數統計改用 popup 顯示
+        const nm2 = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
+        return show(`✊ 開盅! ・ 💀 ${nm2(r.loserId)} 輸了! ・ 房主可按「再來一場」`);
       }
       if (r.subGame === 'poker') {
         if (r.loserId) {
@@ -593,7 +599,7 @@ function renderBanner() {
       else if (g.phase === 'reveal') msg += ' ・ 按「搖下一骰」繼續';
       return show(msg);
     }
-    if (g.reveal && g.reveal.pending) return show('規則建置中…');
+    if (g.reveal && g.reveal.pending && g.phase !== 'pickLoser') return show('規則建置中…');
   }
 
   if (state.winnerId) {
@@ -610,7 +616,12 @@ function renderBanner() {
       return show(`🎲 各自搖骰中(<strong>${done}/${total}</strong> 已搖完),全員搖完才能抓`);
     }
     if (g.reveal) {
-      return show('✊ 開盅!'); // 各點數統計改用 popup 顯示
+      if (g.phase === 'pickLoser') {
+        return show(state.you.isHost ? '👇 請選出本輪輸家' : '⏳ 等待房主選出輸家…');
+      }
+      const nmL = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
+      if ((g.reveal.losers || []).length) return show(`✊ 開盅! ・ 💀 ${nmL(g.reveal.losers[0])} 輸了!`);
+      return show('✊ 開盅!');
     }
   }
   el.style.display = 'none';
@@ -845,6 +856,22 @@ function renderControls() {
     return; // 搖骰改由「按住→放開」處理(見 pressRoll/releaseRoll)
   }
 
+  if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'pickLoser') {
+    if (state.you.isHost) {
+      const btns = (g.order || []).map((id) => {
+        const p = state.players.find((x) => x.id === id);
+        return `<button class="chip pick-loser-btn" data-pid="${id}">${esc(p ? p.name : id)}</button>`;
+      }).join('');
+      el.innerHTML = `<div class="mode-btns">${btns}</div>`;
+      el.querySelectorAll('.pick-loser-btn').forEach((b) =>
+        b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
+      );
+    } else {
+      el.innerHTML = '<p class="muted">等待房主選出輸家…</p>';
+    }
+    return;
+  }
+
   if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'rolling') {
     const rolled = (g.rolled || []).includes(myId);
     const allRolled = (g.order || []).length > 0 && (g.rolled || []).length === g.order.length;
@@ -886,6 +913,21 @@ function renderControls() {
       } else {
         const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; }).join('、');
         el.innerHTML = `<p class="muted">等待 ${names} 重骰或認輸…</p>`;
+      }
+      return;
+    }
+    if (g.phase === 'pickLoser') {
+      if (state.you.isHost) {
+        const btns = (g.order || []).map((id) => {
+          const p = state.players.find((x) => x.id === id);
+          return `<button class="chip pick-loser-btn" data-pid="${id}">${esc(p ? p.name : id)}</button>`;
+        }).join('');
+        el.innerHTML = `<div class="mode-btns">${btns}</div>`;
+        el.querySelectorAll('.pick-loser-btn').forEach((b) =>
+          b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
+        );
+      } else {
+        el.innerHTML = '<p class="muted">等待房主選出輸家…</p>';
       }
       return;
     }

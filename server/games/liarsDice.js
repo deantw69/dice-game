@@ -46,7 +46,7 @@ export const liarsDice = {
       return { ok: true };
     }
 
-    // 抓(開盅):需全員搖完後,任何人才可按 → 直接公開所有人 + 統計
+    // 抓(開盅):需全員搖完後,任何人才可按 → 公開所有人 + 統計,進入房主選輸家
     if (action.type === 'grab') {
       if (round.phase !== 'rolling') return { error: '已經開盅了' };
       if (!round.order.every((id) => round.rolled.includes(id))) {
@@ -54,6 +54,20 @@ export const liarsDice = {
       }
       doReveal(round);
       return { ok: true, revealed: true };
+    }
+
+    // 房主選輸家,進入 roundEnd
+    if (action.type === 'pickLoser') {
+      if (round.phase !== 'pickLoser') return { error: '現在不能選輸家' };
+      if (player.id !== round.hostId) return { error: '只有房主能選輸家' };
+      const targetId = action.targetId;
+      if (!round.order.includes(targetId)) return { error: '無效的目標玩家' };
+      match.diceLeft[targetId] = Math.max(0, (match.diceLeft[targetId] || 0) - 1);
+      round.reveal.losers = [targetId];
+      round.reveal.loserId = targetId;
+      round.reveal.pending = false;
+      round.phase = 'roundEnd';
+      return { ok: true };
     }
 
     return { error: '無效動作' };
@@ -91,6 +105,6 @@ function doReveal(round) {
   for (const id of round.order) {
     for (const d of round.hands[id] || []) stats[d] = (stats[d] || 0) + 1;
   }
-  round.phase = 'roundEnd';
-  round.reveal = { hands: round.hands, stats };
+  round.phase = 'pickLoser'; // 等房主選輸家後才進 roundEnd
+  round.reveal = { hands: round.hands, stats, losers: [], pending: true };
 }

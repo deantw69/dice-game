@@ -86,6 +86,7 @@ export function startRound(room, playerId) {
     room.round = mode.startRound();
   }
 
+  room.round.hostId = room.hostId; // 供各模式的 pickLoser 驗證
   room.status = 'playing';
   return { ok: true };
 }
@@ -215,6 +216,11 @@ export function onPlayerLeft(room, leftId) {
 
   // 回合結算後:若場上已無正式玩家但仍有觀戰者,自動把觀戰者轉正並補房主
   ensurePlayers(room);
+
+  // 房主離開後 hostId 可能已換人 → 同步 round.hostId(供 pickLoser 驗證)
+  if (room.round && room.round.phase === 'pickLoser') {
+    room.round.hostId = room.hostId;
+  }
 }
 
 // 把離場者從一輪的 order/rolled/hands 清掉;回傳此人原本是否在局內(供後續判定)

@@ -422,9 +422,20 @@ button.danger:hover { filter: brightness(1.08); }
   animation: loserPop .3s cubic-bezier(.2,.9,.3,1.25);
 }
 .stats-popup .stats-title { font-size: var(--fs-md); color: var(--accent2); margin-bottom: 12px; }
-.stats-popup .stats-grid { display: grid; grid-template-columns: repeat(3, auto); gap: 8px 18px; justify-content: center; }
-.stats-popup .stat-cell { font-size: 1.3rem; font-weight: 700; }
-.stats-popup .stat-cell b { font-size: 1.5rem; font-weight: 400; }
+.stats-popup .stats-grid { display: grid; grid-template-columns: repeat(3, auto); gap: 12px 20px; justify-content: center; }
+.stats-popup .stat-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.stats-popup .stat-cell b { font-size: 1.1rem; font-weight: 700; }
+.stats-popup .stat-die-stage { display: flex; align-items: center; justify-content: center; perspective: 700px; width: 44px; height: 44px; }
+.stats-popup .stat-die-stage .die3d-scene,
+.stats-popup .stat-die-stage .die3d { width: 44px; height: 44px; }
+.stats-popup .stat-die-stage .die3d .face { width: 44px; height: 44px; padding: 6px; border-radius: 9px; }
+.stats-popup .stat-die-stage .die3d .pip { width: 7px; height: 7px; }
+.stats-popup .stat-die-stage .f1 { transform: rotateY(0deg)   translateZ(22px); }
+.stats-popup .stat-die-stage .f6 { transform: rotateY(180deg) translateZ(22px); }
+.stats-popup .stat-die-stage .f3 { transform: rotateY(90deg)  translateZ(22px); }
+.stats-popup .stat-die-stage .f4 { transform: rotateY(-90deg) translateZ(22px); }
+.stats-popup .stat-die-stage .f2 { transform: rotateX(90deg)  translateZ(22px); }
+.stats-popup .stat-die-stage .f5 { transform: rotateX(-90deg) translateZ(22px); }
 /* 話胚:可點選鎖定的骰子 */
 .die3d-scene.lockable { cursor: pointer; }
 /* 被鎖定的骰子:琥珀外框 + 右上角鎖頭(移出中央 → 點數完整可見、鎖頭也清楚) */

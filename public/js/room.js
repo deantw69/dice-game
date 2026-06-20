@@ -285,12 +285,30 @@ function renderBluffStats() {
   if (key === lastStatsKey) { if (el.style.display === 'none') el.style.display = 'flex'; return; }
   lastStatsKey = key;
   statsDismissedKey = '';
-  const cells = [1, 2, 3, 4, 5, 6].map((f) =>
-    `<span class="stat-cell"><b>${DIE_FACES[f]}</b> ×${stats[f] || 0}</span>`).join('');
-  el.innerHTML = `<div class="stats-card">`
-    + `<div class="stats-title">✊ 開盅!各點數統計</div>`
-    + `<div class="stats-grid">${cells}</div>`
-    + `</div>`;
+  const card = document.createElement('div');
+  card.className = 'stats-card';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'stats-title';
+  titleEl.textContent = '✊ 開盅!各點數統計';
+  card.appendChild(titleEl);
+  const grid = document.createElement('div');
+  grid.className = 'stats-grid';
+  for (let f = 1; f <= 6; f++) {
+    const cell = document.createElement('span');
+    cell.className = 'stat-cell';
+    const stage = document.createElement('div');
+    stage.className = 'stat-die-stage';
+    const countEl = document.createElement('b');
+    countEl.textContent = `×${stats[f] || 0}`;
+    cell.appendChild(stage);
+    cell.appendChild(countEl);
+    grid.appendChild(cell);
+    const renderer = createDice(stage, { count: 1 });
+    renderer.setStatic([f]);
+  }
+  card.appendChild(grid);
+  el.innerHTML = '';
+  el.appendChild(card);
   el.style.display = 'flex';
 }
 

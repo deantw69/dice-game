@@ -380,8 +380,9 @@ button.danger:hover { filter: brightness(1.08); }
 .board-cell { flex: 1 1 190px; max-width: 260px; min-width: 150px; background: var(--panel); border: 1px solid var(--border-faint); border-radius: var(--r-lg); padding: 16px 14px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
 /* 只顯示自己時(吹牛骰抓之前):單一格置中加寬,骰子橫向鋪開 */
 #board.solo .board-cell { flex-basis: 100%; max-width: 480px; }
-/* 自己的格子:換背景色 + 青色細邊(外框 box-shadow 另有用途,故用 border) */
-.board-cell.mine { background: linear-gradient(160deg, #34406f, #3a3170); border-color: rgba(77,208,255,0.5); }
+/* 自己的格子:金色邊 + 呼吸脈衝光暈,與其他玩家的透明細邊形成強對比 */
+.board-cell.mine { background: linear-gradient(160deg, #2c3a72, #3a2e78); border: 2px solid var(--accent); animation: minePulse 1.4s ease-in-out infinite; }
+@keyframes minePulse { 0%,100% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 3px var(--accent); } 50% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 6px rgba(255,204,77,0.3); } }
 /* 話胚:牌型最小的玩家(可重骰/認輸)→ 紅框(偏負面:快輸了) */
 .board-cell.lowest { box-shadow: 0 0 0 3px var(--lose); }
 /* 正在等待此玩家做決定(選玩法 / 選條件)→ 青色呼吸光暈(中性聚焦,與「最小者」紅框區隔) */

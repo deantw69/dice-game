@@ -30,7 +30,7 @@ export function createRenderer(container, options = {}) {
   function applyFit(n) {
     const gap = n > 30 ? 2 : 4;
     const W = Math.max(110, tray.clientWidth || 260) - 6; // 盅內可用寬度
-    const H = 108;                                        // 盅內可用高度(留邊距給搖動)
+    const H = 168;                                        // 盅內可用高度(盅變高後可堆更高,骰子不用縮太小;留邊距給搖動)
     let d = 56;
     for (; d >= 8; d -= 2) {
       const cols = Math.max(1, Math.floor(W / (d + gap)));

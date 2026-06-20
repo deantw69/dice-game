@@ -800,19 +800,23 @@ function renderBoard() {
           } else {
             cup.renderer.setStatic(g.myDice);        // 純重繪 / 再打開:不重播翻滾
           }
-          info.innerHTML = pipCountSummary(g.myDice);          // 自己的點數統計
+          // 統計區跟著盅的開合:蓋著時隱形(保留高度避免版面跳動),打開時才顯示
+          info.innerHTML = pipCountSummary(g.myDice);
+          const syncInfo = () => { info.style.visibility = cup.peeked ? 'hidden' : 'visible'; };
+          syncInfo();
           // 開盅後:點骰子區域可暫時蓋回 / 再打開(反覆),純前端視覺
           stage.style.cursor = 'pointer';
           stage.title = '點一下蓋回 / 打開';
           stage.onclick = () => {
             cup.peeked = !cup.peeked;
             if (cup.peeked) cup.renderer.cover(); else cup.renderer.setStatic(g.myDice);
+            syncInfo();
           };
         } else {
           cup.renderer.cover();        // 尚未搖:盅蓋著待命
           cup.handSig = null; cup.peeked = false;
           stage.onclick = null; stage.style.cursor = ''; stage.title = '';
-          info.textContent = '';
+          info.textContent = ''; info.style.visibility = 'visible';
         }
       }
     } else if (g.mode === 'mixed') {

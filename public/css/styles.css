@@ -144,7 +144,9 @@ input[type="number"], input[type="text"] {
 
 /* ===== CSS 3D 骰子 ===== */
 .die3d-scene { width: 80px; height: 80px; perspective: none; position: relative; }
-/* 開牌時:要被拿掉的骰子畫上紅色叉叉 */
+/* 開牌時:要被拿掉的骰子畫上紅色叉叉
+   叉叉用半透明、較細的線,避免蓋住中央點數(單點 1/3/5 的中心點),
+   讓玩家仍能看清被拿掉的骰子點數 */
 .die3d-scene.marked::after {
   content: '';
   position: absolute;
@@ -152,8 +154,8 @@ input[type="number"], input[type="text"] {
   z-index: 5;
   pointer-events: none;
   background:
-    linear-gradient(to top left,  transparent calc(50% - 2px), var(--danger) calc(50% - 2px), var(--danger) calc(50% + 2px), transparent calc(50% + 2px)),
-    linear-gradient(to top right, transparent calc(50% - 2px), var(--danger) calc(50% - 2px), var(--danger) calc(50% + 2px), transparent calc(50% + 2px));
+    linear-gradient(to top left,  transparent calc(50% - 1.5px), rgba(226,59,59,.65) calc(50% - 1.5px), rgba(226,59,59,.65) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(to top right, transparent calc(50% - 1.5px), rgba(226,59,59,.65) calc(50% - 1.5px), rgba(226,59,59,.65) calc(50% + 1.5px), transparent calc(50% + 1.5px));
 }
 .die3d {
   width: 80px; height: 80px;

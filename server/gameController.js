@@ -112,11 +112,13 @@ export function handleAction(room, player, action) {
     }
   } else if (isMatchMode(mode)) {
     if (room.round.phase === 'roundEnd') {
+      // 吹牛骰:每一輪房主選出輸家就計一次「輸的次數」(非整場結束才算)
+      if (mode.id === 'liars') recordRoundLosers(room);
       if (mode.isMatchOver(room.match, room.players)) {
         room.matchOver = true;
         const w = mode.winner(room.match, room.players);
         room.winnerId = w ? w.id : null;
-        recordLosses(room); // 累計輸的次數(每場僅一次)
+        if (mode.id !== 'liars') recordLosses(room); // 吹牛骰已每輪計過,避免重複
       }
       room.status = 'lobby'; // 等房主開下一輪 / 或整場已結束
     }
@@ -144,6 +146,24 @@ function recordLosses(room) {
   room.lastLosers = uniq; // 上一場輸家(可能為空,如吹牛)
   // 記住本場「選條件/玩法的人」,作為下一場順位決定者的起點
   room.lastChooserId = (room.round && room.round.chooserId) || null;
+  if (!room.losses) room.losses = {};
+  for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
+}
+
+// 吹牛骰:本輪房主選出的輸家計一次「輸的次數」(每輪僅計一次)
+function recordRoundLosers(room) {
+  const r = room.round;
+  if (!r || r.lossCounted) return;
+  const rv = r.reveal;
+  const losers = [];
+  if (rv) {
+    if (rv.loserId) losers.push(rv.loserId);
+    if (Array.isArray(rv.losers)) losers.push(...rv.losers);
+  }
+  const uniq = [...new Set(losers)];
+  if (!uniq.length) return;
+  r.lossCounted = true;
+  room.lastLosers = uniq;
   if (!room.losses) room.losses = {};
   for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
 }

@@ -124,7 +124,7 @@ function getCup(stage, key, count) {
     stage.innerHTML = '';
     stage.classList.add('cup-cell');
     diceCache.delete(key); // 同一格若曾是 CSS3D 骰子,清掉避免混用
-    const renderer = createCup(stage, { count: n, style: 'wood', lift: 'up', sound: false });
+    const renderer = createCup(stage, { count: n, style: 'wood', lift: 'up', sound: false, scatter: true });
     entry = { renderer, el: stage, count: n, handSig: null, peeked: false };
     cupCache.set(key, entry);
   }

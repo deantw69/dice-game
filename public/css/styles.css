@@ -55,6 +55,18 @@ body {
   background: radial-gradient(1200px 800px at 50% -10%, var(--bg2), var(--bg));
   color: var(--text);
   min-height: 100vh;
+
+  /* 手機長按(尤其長按擲骰鈕)避免觸發文字框選 / 長按選單 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 輸入類元件仍保留可選取 / 可複製 */
+input, textarea, select, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 a { color: var(--accent2); }

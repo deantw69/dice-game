@@ -260,10 +260,12 @@ export function createRenderer(container, options = {}) {
   function reveal(values) {
     applyFit(values.length);
     vessel.classList.remove('shake');
-    vessel.classList.add('lift');
-    if (scatter) layout(values.length, true); // 新的一手:重抽散落位置
-    dice.rollTo(values);
-    if (scatter) animateScatter();             // 掀蓋後骰子撞來撞去,最後停在不重疊位置
+    requestAnimationFrame(() => {
+      vessel.classList.add('lift');
+      if (scatter) layout(values.length, true);
+      dice.rollTo(values);
+      if (scatter) animateScatter();
+    });
   }
   // 靜態(已開過盅、純重繪):直接掀蓋亮點,不重播動畫
   function setStatic(values) {

@@ -310,6 +310,42 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); margin: 16px 0; }
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-line); }
 .error { color: var(--danger-text); min-height: 1.2em; margin: 8px 0 0; }
+
+/* ===== 首頁雙欄(home-card + room-list) ===== */
+.home-row {
+  display: flex; gap: 18px; align-items: flex-start; justify-content: center;
+  width: min(780px, 94vw); margin: 14px auto;
+}
+.home-row .home-card { margin: 0; flex-shrink: 0; }
+.room-list-card {
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--r-lg);
+  padding: 18px 16px; box-shadow: var(--shadow-card); text-align: left;
+  width: min(360px, 90vw); max-height: 420px; overflow-y: auto;
+}
+.room-list-title { margin: 0 0 12px; font-size: var(--fs-md); color: var(--text); }
+.room-list { display: flex; flex-direction: column; gap: 8px; }
+.room-list-empty { margin: 0; text-align: center; font-size: var(--fs-sm); }
+.room-list-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--input-bg); border: 1px solid var(--border);
+  cursor: pointer; transition: border-color .15s ease, background .15s ease;
+}
+.room-list-item:hover { border-color: var(--accent); background: rgba(255,204,77,0.08); }
+.room-item-code { font-weight: 800; letter-spacing: 2px; color: var(--accent); font-size: var(--fs-base); min-width: 58px; }
+.room-item-info { flex: 1; min-width: 0; }
+.room-item-host { font-size: var(--fs-sm); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-item-meta { font-size: var(--fs-xs); color: var(--muted); display: flex; gap: 8px; margin-top: 2px; }
+.room-item-status {
+  font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill);
+  flex-shrink: 0; align-self: center;
+}
+.room-item-status.lobby { background: rgba(84,224,138,0.16); color: var(--success); }
+.room-item-status.playing { background: rgba(77,208,255,0.16); color: var(--accent2); }
+@media (max-width: 600px) {
+  .home-row { flex-direction: column; align-items: center; width: auto; }
+  .room-list-card { width: min(360px, 90vw); max-height: 260px; }
+}
 /* toast 提示:依語意分色的小膠囊(空時不顯示底色;成功/資訊/錯誤各一色) */
 #toast { margin: 8px 0 0; display: inline-block; border-radius: var(--r-pill); font-weight: 600; font-size: var(--fs-sm); transition: opacity .2s ease; }
 #toast:empty { display: none; margin: 0; } /* 沒訊息時完全收合,不在 room-top 下方留空白 */

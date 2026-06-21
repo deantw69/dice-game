@@ -11,29 +11,38 @@
     <h1>🎲 骰盅遊戲</h1>
     <p class="muted">多人線上搖骰 ・ 純搖骰 / 吹牛骰</p>
 
-    <div class="home-card">
-      <label class="block">暱稱
-        <input id="name" type="text" maxlength="12" placeholder="輸入你的暱稱" autocomplete="off" />
-      </label>
+    <div class="home-row">
+      <div class="home-card">
+        <label class="block">暱稱
+          <input id="name" type="text" maxlength="12" placeholder="輸入你的暱稱" autocomplete="off" />
+        </label>
 
-      <label class="block">自訂房號 <span class="muted">(可留空,系統隨機產生)</span>
-        <input id="customCode" type="text" maxlength="4" placeholder="4 碼英數,例如 GAME" autocomplete="off"
-               style="text-transform:uppercase;" />
-      </label>
+        <label class="block">自訂房號 <span class="muted">(可留空,系統隨機產生)</span>
+          <input id="customCode" type="text" maxlength="4" placeholder="4 碼英數,例如 GAME" autocomplete="off"
+                 style="text-transform:uppercase;" />
+        </label>
 
-      <div class="home-actions">
-        <button id="create">建立房間</button>
+        <div class="home-actions">
+          <button id="create">建立房間</button>
+        </div>
+
+        <div class="divider"><span>或</span></div>
+
+        <label class="block">房號
+          <input id="code" type="text" maxlength="4" placeholder="輸入 4 碼房號" autocomplete="off"
+                 style="text-transform:uppercase;" />
+        </label>
+        <button id="join" class="secondary">加入房間</button>
+
+        <p id="err" class="error" role="alert"></p>
       </div>
 
-      <div class="divider"><span>或</span></div>
-
-      <label class="block">房號
-        <input id="code" type="text" maxlength="4" placeholder="輸入 4 碼房號" autocomplete="off"
-               style="text-transform:uppercase;" />
-      </label>
-      <button id="join" class="secondary">加入房間</button>
-
-      <p id="err" class="error" role="alert"></p>
+      <div class="room-list-card" id="roomListCard">
+        <h2 class="room-list-title">現有房間</h2>
+        <div class="room-list" id="roomList">
+          <p class="muted room-list-empty">目前沒有房間</p>
+        </div>
+      </div>
     </div>
 
     <p class="muted"><a href="/demo.html">看骰子動畫 demo →</a></p>

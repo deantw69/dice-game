@@ -110,6 +110,22 @@ export function getRoom(code) {
   return rooms.get(code);
 }
 
+export function getRoomList() {
+  const list = [];
+  for (const room of rooms.values()) {
+    const host = room.players.find((p) => p.id === room.hostId);
+    list.push({
+      code: room.code,
+      hostName: host?.name || '?',
+      playerCount: room.players.length,
+      spectatorCount: room.spectators.length,
+      status: room.status,
+      modeId: room.modeId,
+    });
+  }
+  return list;
+}
+
 // socket 斷線:給予寬限期,逾時移除座位
 export function handleDisconnect(socketId, onTimeout) {
   const room = findRoomBySocket(socketId);

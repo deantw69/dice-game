@@ -21,6 +21,10 @@ app.get('/version', (_req, res) => res.json({ commit: COMMIT }));
 
 app.use(express.static(PUBLIC_DIR));
 
+function broadcastRoomList() {
+  io.emit('roomListUpdate', rm.getRoomList());
+}
+
 // 把房間狀態(個人化視圖)推送給每位成員
 function broadcastRoom(room) {
   if (!room) return;
@@ -29,10 +33,15 @@ function broadcastRoom(room) {
       io.to(p.socketId).emit('roomState', rm.viewFor(room, p.id));
     }
   }
+  broadcastRoomList();
 }
 
 io.on('connection', (socket) => {
   console.log(`[socket] connected: ${socket.id}`);
+
+  socket.on('listRooms', (cb) => {
+    cb?.({ rooms: rm.getRoomList() });
+  });
 
   socket.on('createRoom', ({ name, code }, cb) => {
     name = (name || '').trim();

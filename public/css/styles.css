@@ -205,6 +205,9 @@ input[type="number"], input[type="text"] {
 /* 骰子大小由 --ds 控制(diceCup 依數量動態調整,確保塞進盅內) */
 /* 骰子排列區比骰盅窄一些,讓骰盅搖動時邊緣仍蓋得住骰子 */
 .cup-tray { --ds: 56px; display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; width: 52%; max-width: 184px; }
+/* 散落模式:盅內骰子改絕對定位,位置/角度由 JS 隨機指定(略小於盅身,確保落在可覆蓋範圍內) */
+.cup-tray.scatter { position: relative; flex-wrap: nowrap; width: 58%; max-width: 200px; height: 150px; }
+.cup-scene .cup-tray.scatter .die3d-scene { position: absolute; }
 /* 盅內骰子翻滾時間較短(掀蓋後露出來才看得到動) */
 .cup-tray .die3d { transition: transform 0.8s cubic-bezier(.2,.85,.25,1); }
 /* 骰子尺寸由 --ds 動態控制(依數量縮放,確保不超出骰盅)。

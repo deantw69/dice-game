@@ -209,9 +209,10 @@ export function onPlayerLeft(room, leftId) {
         if (r.order.length === 0) {
           room.status = 'lobby';
         } else {
-          // 離開者是最後一個未搖的 → 進入下一階段(已選玩法則直接選條件)
-          if (r.phase === 'rolling' && r.order.every((id) => r.rolled.includes(id))) {
-            r.phase = r.subGame ? 'condition' : 'choosing';
+          // 離開者是最後一個未搖的 → 進入下一階段(rolling 本骰,或 reveal 的「搖下一骰」)
+          if ((r.phase === 'rolling' || r.phase === 'reveal')
+            && r.order.length && r.order.every((id) => r.rolled.includes(id))) {
+            mode.afterAllRolled(r);
           }
           // 選條件的人離開 → 交給場上第一位接手決定
           if (r.phase === 'condition' && r.chooserId === leftId) {

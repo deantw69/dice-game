@@ -58,39 +58,41 @@ export const mixedMode = {
     };
   },
 
+  // 全員搖完(本骰,或紅黑單雙開牌後的「下一骰」)→ 清掉上一骰開牌並進入後續階段
+  afterAllRolled(round) {
+    round.reveal = null;
+    round.condition = null;
+    if (round.subGame === 'redblack' && round.autoRotate) {
+      // 自動順位:由玩家列表順序的「下一位」決定要拿掉哪一種
+      const i = round.order.indexOf(round.chooserId);
+      round.chooserId = round.order[(i + 1) % round.order.length];
+      round.openPick = false;
+      round.phase = 'condition';
+    } else if (round.subGame) {
+      // 未開自動順位:任何人先按先決定
+      round.phase = 'condition';
+      round.openPick = true;
+      round.chooserId = null;
+    } else {
+      round.phase = 'choosing';
+    }
+  },
+
   handleAction(round, match, player, action, players) {
     if (!round.order.includes(player.id)) return { error: '你不在本局中' };
 
-    // 各自搖暗骰(rolling;或在 reveal 階段按「搖下一骰」接續同場下一骰)
+    // 各自搖暗骰(rolling;或紅黑單雙開牌後在 reveal 階段按「搖下一骰」接續同場下一骰)
     if (action.type === 'roll') {
-      if (round.phase === 'reveal') {
-        // 開牌看完 → 開始同一場的下一骰
-        round.phase = 'rolling';
-        round.hands = {};
-        round.rolled = [];
-        round.reveal = null;
-        round.condition = null;
+      // reveal 階段的「搖下一骰」:每位玩家各自獨立搖,搖之前仍看著上一骰開牌結果,
+      // 不會因別人先搖就被切走畫面(per-player view 由 privateView 控制)。
+      if (round.phase !== 'rolling' && round.phase !== 'reveal') {
+        return { error: '現在不是搖骰階段' };
       }
-      if (round.phase !== 'rolling') return { error: '現在不是搖骰階段' };
       if (round.rolled.includes(player.id)) return { error: '你已經搖過了' };
       round.hands[player.id] = rollDice(match.diceLeft[player.id]);
       round.rolled.push(player.id);
-      if (round.order.every((id) => round.rolled.includes(id))) {
-        if (round.subGame === 'redblack' && round.autoRotate) {
-          // 自動順位:由玩家列表順序的「下一位」決定要拿掉哪一種
-          const i = round.order.indexOf(round.chooserId);
-          round.chooserId = round.order[(i + 1) % round.order.length];
-          round.openPick = false;
-          round.phase = 'condition';
-        } else if (round.subGame) {
-          // 未開自動順位:任何人先按先決定
-          round.phase = 'condition';
-          round.openPick = true;
-          round.chooserId = null;
-        } else {
-          round.phase = 'choosing';
-        }
-      }
+      // 全員都搖完(本骰或下一骰)→ 清掉上一骰開牌、進入後續階段
+      if (round.order.every((id) => round.rolled.includes(id))) this.afterAllRolled(round);
       return { ok: true };
     }
 
@@ -274,9 +276,17 @@ export const mixedMode = {
 
   privateView(round, player) {
     const hand = (round.hands && round.hands[player.id]) || [];
+    // 紅黑單雙開牌後「搖下一骰」:已自行搖了下一骰的玩家,個人視角前進到 rolling
+    // (看不到上一骰開牌),其餘玩家仍停在 reveal 看點數,直到自己按下才前進。
+    const advanced = round.phase === 'reveal'
+      && round.subGame === 'redblack'
+      && round.rolled.includes(player.id);
+    const effPhase = advanced ? 'rolling' : round.phase;
     // 只剩 1 顆 → 盲骰:開牌前連自己也看不到點數
-    const blind = hand.length === 1 && round.phase !== 'reveal' && round.phase !== 'roundEnd';
-    return { myDice: blind ? [] : hand, blind };
+    const blind = hand.length === 1 && effPhase !== 'reveal' && effPhase !== 'roundEnd';
+    const out = { myDice: blind ? [] : hand, blind };
+    if (advanced) { out.phase = 'rolling'; out.reveal = null; }
+    return out;
   },
 
   // 有玩家離開時:話胚比較中需重新評定最小者
@@ -450,4 +460,10 @@ function resolveRedBlack(round, match, condId, cond) {
     losers,             // 失去所有骰子者(輸)
     pending: false,
   };
+  if (round.phase === 'reveal') {
+    // 進入「搖下一骰」:清空當前手牌與搖骰紀錄,讓每位玩家各自獨立搖下一骰。
+    // (reveal.hands 已指向舊的 hands 物件,重新指派 round.hands 不影響開牌顯示。)
+    round.hands = {};
+    round.rolled = [];
+  }
 }

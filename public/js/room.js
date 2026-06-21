@@ -1197,3 +1197,48 @@ $('autoRoll').addEventListener('change', (e) => {
   if (autoRoll) maybeAutoRoll(); // 若此刻正好輪到我搖,立即骰
 });
 
+// ---- 搖手機擲骰(手機):偵測搖晃 → 等同按住搖骰,停下即放開定骰 ----
+let shakeRoll = localStorage.getItem('dice.shakeRoll') === '1';
+const shakeState = { last: null, idleTimer: null };
+const SHAKE_THRESHOLD = 15;   // 相鄰取樣的加速度變化量門檻(越大越需用力)
+const SHAKE_STOP_MS = 450;    // 停止搖晃多久後放開定骰
+function supportsDeviceMotion() {
+  return typeof window.DeviceMotionEvent !== 'undefined' && 'ontouchstart' in window;
+}
+function onDeviceMotion(e) {
+  if (!shakeRoll) return;
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if (!a) return;
+  const cur = { x: a.x || 0, y: a.y || 0, z: a.z || 0 };
+  const prev = shakeState.last;
+  shakeState.last = cur;
+  if (!prev) return;
+  const delta = Math.abs(cur.x - prev.x) + Math.abs(cur.y - prev.y) + Math.abs(cur.z - prev.z);
+  if (delta < SHAKE_THRESHOLD) return; // 不夠用力,不算搖
+  const kind = canRollNow() ? 'roll' : (canRerollNow() ? 'reroll' : null);
+  if (!rollSpin.active) { if (!kind) return; pressRoll(kind); } // 開始搖
+  if (shakeState.idleTimer) clearTimeout(shakeState.idleTimer);
+  shakeState.idleTimer = setTimeout(() => releaseRoll(), SHAKE_STOP_MS); // 停手 → 定骰
+}
+window.addEventListener('devicemotion', onDeviceMotion);
+// iOS 13+ 需在使用者手勢中向 DeviceMotionEvent 申請動作感測權限
+async function requestMotionPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res !== 'granted') { toast('未取得動作感測權限'); return false; }
+    } catch { toast('此裝置無法啟用搖晃偵測'); return false; }
+  }
+  return true;
+}
+if (supportsDeviceMotion()) $('shakeRollWrap').style.display = '';
+$('shakeRoll').checked = shakeRoll;
+$('shakeRoll').addEventListener('change', async (e) => {
+  if (e.target.checked) {
+    const ok = await requestMotionPermission();
+    if (!ok) { e.target.checked = false; return; }
+  }
+  shakeRoll = e.target.checked;
+  localStorage.setItem('dice.shakeRoll', shakeRoll ? '1' : '0');
+});
+

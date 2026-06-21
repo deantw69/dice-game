@@ -211,7 +211,7 @@ export function onPlayerLeft(room, leftId) {
         } else {
           // 離開者是最後一個未搖的 → 進入下一階段(rolling 本骰,或 reveal 的「搖下一骰」)
           if ((r.phase === 'rolling' || r.phase === 'reveal')
-            && r.order.length && r.order.every((id) => r.rolled.includes(id))) {
+            && r.order.every((id) => r.rolled.includes(id))) {
             mode.afterAllRolled(r);
           }
           // 選條件的人離開 → 交給場上第一位接手決定

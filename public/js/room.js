@@ -259,6 +259,8 @@ function iNeedToRoll() {
 // 自動骰:輪到我搖骰時,不用按、直接送出(每回合僅送一次)
 function maybeAutoRoll() {
   if (!autoRoll || autoRolling || rollSpin.active || !iNeedToRoll()) return;
+  const m = state.game?.mode;
+  if (m === 'roulette' || m === 'blackjack21') return;
   autoRolling = true;
   playRattle(500); // 給點音效回饋
   emit('action', { type: 'roll' }).then((res) => {

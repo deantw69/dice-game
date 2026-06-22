@@ -432,6 +432,7 @@ button.danger:hover { filter: brightness(1.08); }
 
 .lobby-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .lobby-row .label { color: var(--muted); min-width: 78px; }
+.lobby-row.hint { font-size: .8em; color: var(--muted); margin-top: -8px; }
 .mode-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); padding: 8px 14px; border-radius: var(--r-pill); transition: border-color .15s ease, background .15s ease; }
 .chip:not(.active):hover { border-color: var(--accent); background: rgba(255,204,77,0.08); }
@@ -465,6 +466,18 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: var(--lose); line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
 .loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: var(--lose-text); }
 .loser-popup .loser-hint { margin-top: 10px; font-size: var(--fs-xs); }
+/* 最終勝利者 popup */
+.winner-popup { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.winner-popup .winner-card {
+  pointer-events: auto;
+  text-align: center; padding: 28px 40px; border-radius: var(--r-lg);
+  background: linear-gradient(135deg, #2a1d04, #3a2a08); border: 2px solid #f5c842;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 9999px rgba(0,0,0,0.45);
+  animation: winnerPop .45s cubic-bezier(.2,.9,.3,1.25);
+}
+@keyframes winnerPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.winner-popup .winner-title { font-size: var(--fs-md); letter-spacing: 3px; color: #f5c842; margin-bottom: 4px; }
+.winner-popup .winner-name { font-size: 2.8rem; font-weight: 900; color: #ffd700; line-height: 1.2; text-shadow: 0 2px 12px rgba(255,215,0,0.55); }
 /* 話胚:牌型大小順序(一橫排,精簡) */
 /* 話胚牌型提示:ℹ️ 按鈕浮動固定在左下角,完全不佔版面流、不擠棋盤 */
 .poker-guide { position: fixed; left: 12px; bottom: 12px; z-index: 25; background: none; padding: 0; margin: 0; }

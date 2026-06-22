@@ -19,9 +19,11 @@ export const blackjack21 = {
   },
 
   startRound(match, players) {
-    const alive = players.filter(
-      (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
-    );
+    const alive = match.startLives === 0
+      ? players
+      : players.filter(
+          (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
+        );
     const order = alive.map((p) => p.id);
     const hands = {};
     for (const id of order) {
@@ -80,10 +82,12 @@ export const blackjack21 = {
   finishRound(_round, _players) {},
 
   isMatchOver(match, players) {
+    if (match.startLives === 0) return true;
     return players.filter((p) => (match.lives[p.id] || 0) > 0).length <= 1;
   },
 
   winner(match, players) {
+    if (match.startLives === 0) return null;
     const alive = players.filter((p) => (match.lives[p.id] || 0) > 0);
     return alive.length === 1 ? alive[0] : null;
   },
@@ -158,10 +162,12 @@ function checkAllDone(round, match) {
     losers = round.order.filter((id) => round.hands[id].total === maxTotal);
   }
 
-  for (const id of losers) {
-    match.lives[id] = Math.max(0, (match.lives[id] || 0) - 1);
-    if (match.lives[id] <= 0 && !match.eliminated.includes(id)) {
-      match.eliminated.push(id);
+  if (match.startLives > 0) {
+    for (const id of losers) {
+      match.lives[id] = Math.max(0, (match.lives[id] || 0) - 1);
+      if (match.lives[id] <= 0 && !match.eliminated.includes(id)) {
+        match.eliminated.push(id);
+      }
     }
   }
 

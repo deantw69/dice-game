@@ -40,6 +40,9 @@ let autoNextTimer = null;     // 自動下一場的延遲計時器
 let autoNextArmed = false;    // 本次進大廳是否已排程過(避免重複/洗版)
 let autoRoll = localStorage.getItem('dice.autoRoll') === '1'; // 玩家:搖骰環節自動骰
 let autoRolling = false;      // 防止自動骰重複送出
+let lastWinnerKey = '';       // 上次顯示的最終勝利者
+let winnerDismissedKey = '';  // 已被點掉的勝利者 popup
+let winnerTimer = null;       // 勝利者 popup 延遲顯示計時器
 let lobbyExpanded = false;    // 房主:一局結束後 lobby 預設精簡(只剩「再來一場/換模式」),按「換模式」才展開
 
 // ---- 連線 / 重連 ----
@@ -213,6 +216,7 @@ function render() {
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
   renderPokerGuide();
   if (!pokerRerollAnim) renderLoserBanner(); // 重骰動畫期間先別跳輸家公告(等動畫停再顯示)
+  renderWinnerBanner();
   renderBluffStats();
   updateBarMetric(); // 量測底部動作條高度 → 浮動鈕/棋盤留白貼齊(手機直向)
   maybeAutoNext();
@@ -311,6 +315,37 @@ function renderLoserBanner() {
   playFanfare();
 }
 
+// 淘汰制最終勝利者 popup:matchOver + winnerId 時延遲彈出(讓輸家 popup 先顯示)
+function renderWinnerBanner() {
+  const el = $('winnerPopup');
+  if (!state || !state.matchOver || !state.winnerId) {
+    el.style.display = 'none'; el.innerHTML = '';
+    lastWinnerKey = ''; winnerDismissedKey = '';
+    if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
+    return;
+  }
+  const key = state.winnerId;
+  if (key === winnerDismissedKey) { el.style.display = 'none'; return; }
+  if (key === lastWinnerKey) {
+    if (el.style.display === 'none') el.style.display = 'flex';
+    return;
+  }
+  // 新的勝利者 → 延遲顯示(讓輸家 popup 先亮 1.5 秒)
+  if (winnerTimer) return;
+  winnerTimer = setTimeout(() => {
+    winnerTimer = null;
+    lastWinnerKey = key;
+    winnerDismissedKey = '';
+    const w = state.players.find((p) => p.id === state.winnerId);
+    el.innerHTML = `<div class="winner-card">`
+      + `<div class="winner-title">🏆 最終勝利者 🏆</div>`
+      + `<div class="winner-name">${esc(w ? w.name : '?')}</div>`
+      + `</div>`;
+    el.style.display = 'flex';
+    playFanfare();
+  }, 1800);
+}
+
 // 吹牛開盅(吹牛骰模式 / 混合吹牛子玩法)→ 各點數統計用 popup 顯示
 // 兩者 reveal 都帶 stats;下一場開始(reveal 清空)自動消失,點外面可關
 function renderBluffStats() {
@@ -355,6 +390,10 @@ document.addEventListener('click', (e) => {
   const sp = $('statsPopup');
   if (sp && sp.style.display !== 'none' && lastStatsKey && !(e.target.closest && e.target.closest('.stats-card'))) {
     statsDismissedKey = lastStatsKey; sp.style.display = 'none';
+  }
+  const wp = $('winnerPopup');
+  if (wp && wp.style.display !== 'none' && lastWinnerKey && !(e.target.closest && e.target.closest('.winner-card'))) {
+    winnerDismissedKey = lastWinnerKey; wp.style.display = 'none';
   }
   const el = $('loserPopup');
   if (!el || el.style.display === 'none' || !lastLoserKey) return;
@@ -535,6 +574,11 @@ function renderLobby() {
     html += `<div class="lobby-row"><span class="label">每輪可跳過</span>
       <input id="roulettePasses" type="number" min="0" max="3" value="${state.roulettePasses}" /></div>`;
   }
+  if (state.modeId === 'blackjack21') {
+    html += `<div class="lobby-row"><span class="label">每人生命</span>
+      <input id="blackjackLives" type="number" min="0" max="10" value="${state.blackjackLives}" /></div>`;
+    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
+  }
   if (state.modeId === 'mixed') {
     html += `<div class="lobby-row"><label class="auto-next">
       <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label>
@@ -553,6 +597,7 @@ function renderLobby() {
   );
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
+  $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
   $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
   $('rouletteBust')?.addEventListener('change', (e) => act('setRouletteBust', { value: e.target.value }));
   $('roulettePasses')?.addEventListener('change', (e) => act('setRoulettePasses', { value: e.target.value }));
@@ -916,12 +961,13 @@ function renderBoard() {
     } else if (g.mode === 'blackjack21') {
       const curId = (g.order || [])[g.turnIndex];
       cell.classList.toggle('deciding', p.id === curId && g.phase === 'rolling');
-      // 生命顯示
+      // 生命顯示（單局模式 startLives=0 不顯示生命、不灰掉）
+      const singleRound = state.blackjackLives === 0;
       const lives = (g.lives && g.lives[p.id]) || 0;
-      const hearts = lives > 0 ? '❤️'.repeat(lives) : '💀';
+      const hearts = singleRound ? '' : (lives > 0 ? '❤️'.repeat(lives) : '💀');
       cell.querySelector('.cell-name').innerHTML =
-        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + ` <span class="roulette-lives">${hearts}</span>`;
-      cell.classList.toggle('eliminated', lives <= 0);
+        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + (hearts ? ` <span class="roulette-lives">${hearts}</span>` : '');
+      cell.classList.toggle('eliminated', !singleRound && lives <= 0);
 
       const hand = g.hands && g.hands[p.id];
       if (!hand) { stage.innerHTML = ''; info.textContent = ''; }

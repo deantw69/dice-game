@@ -209,18 +209,28 @@ export function createRenderer(container, options = {}) {
       if (start === null) { start = ts; last = ts; }
       let dt = (ts - last) / 1000; if (dt > 0.05) dt = 0.05; last = ts;
       const elapsed = ts - start;
+      // 阻尼改為「依時間」而非「依幀」:高刷新率螢幕(iPhone/MacBook 的 120Hz ProMotion)
+      // 與一般 60Hz 的衰減速度才一致,否則高刷新率下動能掉太快、骰子還重疊就停住,
+      // 剩 separate() 每幀互推來回振盪 → 快停時一直抖。以 60fps 為基準換算每幀係數。
+      const damp = Math.pow(0.972, dt * 60);
+      const dampA = Math.pow(0.96, dt * 60);
       const before = st.map((s) => ({ x: s.x, y: s.y }));
+      let moving = false;
       for (const s of st) {
         s.x += s.vx * dt; s.y += s.vy * dt; s.a += s.va * dt;
         if (s.x < 0) { s.x = 0; s.vx = -s.vx * 0.88; } else if (s.x > maxX) { s.x = maxX; s.vx = -s.vx * 0.88; }
         if (s.y < 0) { s.y = 0; s.vy = -s.vy * 0.88; } else if (s.y > maxY) { s.y = maxY; s.vy = -s.vy * 0.88; }
-        s.vx *= 0.972; s.vy *= 0.972; s.va *= 0.96; // 阻尼,逐漸停下(撞約 1 秒多)
+        s.vx *= damp; s.vy *= damp; s.va *= dampA; // 阻尼,逐漸停下(撞約 1 秒多)
         // 速度死區:慢到一定程度直接歸零,避免快停時殘留微小速度造成抖動
         if (s.vx * s.vx + s.vy * s.vy < 100) { s.vx = 0; s.vy = 0; }
         if (Math.abs(s.va) < 24) s.va = 0;
+        if (s.vx || s.vy || s.va) moving = true;
       }
       separate(5);                                // 每幀把穿插的骰子推開,維持不重疊(多迭代→收斂快,尾段不殘留creep)
       render();
+      // 所有骰子動能皆已歸零:不再靠多餘幀慢慢逼近(高刷新率下 separate 互推會反覆微抖),
+      // 直接定格。commit() 內再做一次強力分離確保不重疊。
+      if (!moving) { commit(); return; }
       let maxStep = 0;                            // 這一幀實際位移(含碰撞推擠)的最大值
       for (let i = 0; i < n; i++) maxStep = Math.max(maxStep, Math.hypot(st[i].x - before[i].x, st[i].y - before[i].y));
       stillFrames = maxStep < 0.5 ? stillFrames + 1 : 0; // 幾乎不動就準備定格(乾脆停,不拖尾)

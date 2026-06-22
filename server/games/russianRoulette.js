@@ -134,6 +134,7 @@ export const russianRoulette = {
       history: round.history,
       bustPlayer: round.bustPlayer,
       lives: match.lives,
+      reveal: round.reveal || null,
     };
   },
 

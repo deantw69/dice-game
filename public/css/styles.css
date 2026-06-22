@@ -367,9 +367,10 @@ label.block input { display: block; width: 100%; margin-top: 6px; }
   .room-sticky { position: static; box-shadow: none; }
 }
 .room-top {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; background: var(--panel); border-radius: var(--r-md); margin-bottom: 12px;
 }
+.room-top .room-code { flex: 1; }
 .room-code strong { font-size: var(--fs-lg); letter-spacing: 3px; color: var(--accent); }
 button.mini { padding: 6px 12px; font-size: .85rem; }
 .top-actions {
@@ -427,8 +428,6 @@ button.danger:hover { filter: brightness(1.08); }
   .badge { padding: 5px 10px; font-size: var(--fs-xs); }
   .banner { padding: 8px 10px; margin-bottom: 8px; }
   .panel { padding: 10px; margin-bottom: 8px; }
-  /* 手機:隱藏「目前模式」徽章,減少 header 擁擠 */
-  #modeBadge { display: none !important; }
 }
 
 .lobby-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }

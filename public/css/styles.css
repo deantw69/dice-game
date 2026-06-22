@@ -540,6 +540,11 @@ button.danger:hover { filter: brightness(1.08); }
 .sum-pill { display: inline-block; padding: 3px 12px; border-radius: var(--r-pill); background: var(--input-bg); border: 1px solid var(--border-line); font-weight: 700; }
 .sum-pill.lead { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .waiting { color: var(--muted); font-size: var(--fs-sm); }
+.board-cell.eliminated { opacity: 0.4; filter: grayscale(0.8); }
+.roulette-lives { font-size: var(--fs-sm); margin-left: 4px; }
+.roulette-total { font-size: 1.1rem; }
+.roulette-total.warn { color: var(--accent); }
+.roulette-total.danger { color: var(--danger-text); }
 .cup { width: 56px; height: 56px; border-radius: var(--r-sm); background: linear-gradient(160deg,#3a4170,#2a2f55); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 800; color: var(--danger); border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
 
 .center-pad { padding: 40px; text-align: center; }

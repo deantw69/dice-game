@@ -96,6 +96,36 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  socket.on('setRouletteLives', ({ value }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
+    room.rouletteLives = Math.max(1, Math.min(10, parseInt(value) || 3));
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
+  socket.on('setRouletteBust', ({ value }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
+    room.rouletteBust = Math.max(10, Math.min(50, parseInt(value) || 21));
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
+  socket.on('setRoulettePasses', ({ value }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
+    room.roulettePasses = Math.max(0, Math.min(3, parseInt(value) || 1));
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   socket.on('setLoserDecides', ({ on }, cb) => {
     const room = rm.findRoomBySocket(socket.id);
     if (!room) return cb?.({ error: '尚未加入房間' });

@@ -54,7 +54,22 @@ export function startRound(room, playerId) {
   // 觀戰者於每輪開始時併入
   mergeSpectators(room);
 
-  if (mode.id === 'liars') {
+  if (mode.id === 'roulette') {
+    if (!room.match || room.matchOver) {
+      room.match = mode.initMatch(room.players, {
+        lives: room.rouletteLives || 3,
+        bustThreshold: room.rouletteBust || 21,
+        maxPasses: room.roulettePasses ?? 1,
+      });
+      room.matchOver = false;
+      room.winnerId = null;
+    } else {
+      for (const p of room.players) {
+        if (room.match.lives[p.id] == null) room.match.lives[p.id] = room.match.startLives;
+      }
+    }
+    room.round = mode.startRound(room.match, room.players);
+  } else if (mode.id === 'liars') {
     // 吹牛骰每局獨立(無淘汰)→ 每次開始都用「當前設定」重新發骰,改數量即時生效
     room.match = mode.initMatch(room.players, room.diceCount);
     room.matchOver = false;
@@ -112,13 +127,13 @@ export function handleAction(room, player, action) {
     }
   } else if (isMatchMode(mode)) {
     if (room.round.phase === 'roundEnd') {
-      // 吹牛骰:每一輪房主選出輸家就計一次「輸的次數」(非整場結束才算)
-      if (mode.id === 'liars') recordRoundLosers(room);
+      // 吹牛骰/輪盤骰:每一輪就計一次「輸的次數」(非整場結束才算)
+      if (mode.id === 'liars' || mode.id === 'roulette') recordRoundLosers(room);
       if (mode.isMatchOver(room.match, room.players)) {
         room.matchOver = true;
         const w = mode.winner(room.match, room.players);
         room.winnerId = w ? w.id : null;
-        if (mode.id !== 'liars') recordLosses(room); // 吹牛骰已每輪計過,避免重複
+        if (mode.id !== 'liars' && mode.id !== 'roulette') recordLosses(room); // 吹牛骰/輪盤骰已每輪計過
       }
       room.status = 'lobby'; // 等房主開下一輪 / 或整場已結束
     }
@@ -202,6 +217,17 @@ export function onPlayerLeft(room, leftId) {
     } else if (mode.id === 'liars') {
       const r = room.round;
       if (pruneRoundMember(r, leftId) && r.order.length === 0) room.status = 'lobby';
+      finishIfMatchOver(room, mode);
+    } else if (mode.id === 'roulette') {
+      const r = room.round;
+      if (pruneRoundMember(r, leftId)) {
+        if (r.order.length === 0) {
+          room.status = 'lobby';
+        } else {
+          // 離場者是當前行動者 → 修正 turnIndex
+          if (r.turnIndex >= r.order.length) r.turnIndex = r.turnIndex % r.order.length;
+        }
+      }
       finishIfMatchOver(room, mode);
     } else if (mode.id === 'mixed') {
       const r = room.round;

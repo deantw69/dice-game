@@ -242,6 +242,9 @@ function iNeedToRoll() {
   const g = state.game;
   if (!g || state.status !== 'playing' || state.you.isSpectator) return false;
   if (g.mode === 'roll') return g.phase === 'rolling' && !(g.rolls && g.rolls[myId]);
+  if (g.mode === 'roulette') {
+    return g.phase === 'playing' && (g.order || [])[g.turnIndex] === myId;
+  }
   if (g.mode === 'liars' || g.mode === 'mixed') {
     return g.phase === 'rolling'
       && (g.order || []).includes(myId)
@@ -265,9 +268,9 @@ function maybeAutoRoll() {
 function currentLosers() {
   const g = state.game;
   if (!g || !g.reveal) return [];
+  if (g.mode === 'roulette' && g.reveal.loserId) return [g.reveal.loserId];
   if (g.reveal.subGame === 'poker' && g.reveal.loserId) return [g.reveal.loserId];
   if (g.reveal.subGame === 'redblack' && (g.reveal.losers || []).length) return g.reveal.losers;
-  // 吹牛(混合模式)或吹牛骰:房主選定後 pending 變 false 且 losers 有值
   if (!g.reveal.pending && (g.reveal.losers || []).length) return g.reveal.losers;
   return [];
 }
@@ -518,6 +521,14 @@ function renderLobby() {
     html += `<div class="lobby-row"><span class="label">${label}</span>
       <input id="diceCount" type="number" min="1" max="100" value="${state.diceCount}" /></div>`;
   }
+  if (state.modeId === 'roulette') {
+    html += `<div class="lobby-row"><span class="label">每人生命</span>
+      <input id="rouletteLives" type="number" min="1" max="10" value="${state.rouletteLives}" /></div>`;
+    html += `<div class="lobby-row"><span class="label">爆掉門檻</span>
+      <input id="rouletteBust" type="number" min="10" max="50" value="${state.rouletteBust}" /></div>`;
+    html += `<div class="lobby-row"><span class="label">每輪可跳過</span>
+      <input id="roulettePasses" type="number" min="0" max="3" value="${state.roulettePasses}" /></div>`;
+  }
   if (state.modeId === 'mixed') {
     html += `<div class="lobby-row"><label class="auto-next">
       <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label>
@@ -536,6 +547,9 @@ function renderLobby() {
   );
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
+  $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
+  $('rouletteBust')?.addEventListener('change', (e) => act('setRouletteBust', { value: e.target.value }));
+  $('roulettePasses')?.addEventListener('change', (e) => act('setRoulettePasses', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
@@ -574,7 +588,7 @@ function maybeAutoNext() {
 }
 
 function startButtonLabel() {
-  if (state.modeId === 'liars' || state.modeId === 'mixed') {
+  if (state.modeId === 'liars' || state.modeId === 'mixed' || state.modeId === 'roulette') {
     if (state.matchOver) return '再來一場';
     if (state.game) return '下一輪';
     return '開始遊戲';
@@ -627,6 +641,28 @@ function renderBanner() {
       return show(msg);
     }
     if (g.reveal && g.reveal.pending && g.phase !== 'pickLoser') return show('規則建置中…');
+  }
+
+  if (g && g.mode === 'roulette') {
+    if (state.winnerId) {
+      const w = state.players.find((p) => p.id === state.winnerId);
+      return show(`🏆 <strong>${esc(w ? w.name : '')}</strong> 獲勝!`);
+    }
+    if (state.status === 'playing' && g.phase === 'playing') {
+      const curId = (g.order || [])[g.turnIndex];
+      const isMy = curId === myId;
+      const pct = Math.min(100, Math.round((g.total / g.bustThreshold) * 100));
+      const danger = pct >= 80 ? ' danger' : pct >= 60 ? ' warn' : '';
+      return show(
+        `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ${g.bustThreshold}</span>`
+        + (isMy ? ' ・ 👉 <strong>輪到你!</strong>' : ` ・ ⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`),
+      );
+    }
+    if (g.bustPlayer) {
+      return show(`💥 <span class="hl">${nm(g.bustPlayer)}</span> 爆了!(累計 ${g.total} > ${g.bustThreshold})`);
+    }
+    el.style.display = 'none'; el.innerHTML = '';
+    return;
   }
 
   if (state.winnerId) {
@@ -820,6 +856,30 @@ function renderBoard() {
           info.textContent = ''; info.style.visibility = 'visible';
         }
       }
+    } else if (g.mode === 'roulette') {
+      const curId = (g.order || [])[g.turnIndex];
+      cell.classList.toggle('deciding', p.id === curId && g.phase === 'playing');
+      // 生命顯示
+      const lives = (g.lives && g.lives[p.id]) || 0;
+      const hearts = lives > 0 ? '❤️'.repeat(lives) : '💀';
+      cell.querySelector('.cell-name').innerHTML =
+        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + ` <span class="roulette-lives">${hearts}</span>`;
+      // 淘汰玩家灰階
+      cell.classList.toggle('eliminated', lives <= 0);
+
+      if (g.lastRoll && g.lastRoll.playerId === p.id) {
+        showDice(stage, 'cell-' + p.id, [g.lastRoll.value]);
+      } else {
+        stage.innerHTML = '';
+        diceCache.delete('cell-' + p.id);
+      }
+      // 最近動作
+      const last = [...(g.history || [])].reverse().find((h) => h.playerId === p.id);
+      if (last) {
+        info.textContent = last.action === 'pass' ? '跳過' : `擲出 ${last.value}`;
+      } else {
+        info.textContent = '';
+      }
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
       if (reveal && reveal.hands[p.id]) {
@@ -907,6 +967,27 @@ function renderControls() {
       ? '<p class="muted">已搖骰,等待其他玩家…</p>'
       : rollBtn('🎲 搖骰!');
     return; // 搖骰改由「按住→放開」處理(見 pressRoll/releaseRoll)
+  }
+
+  if (g.mode === 'roulette' && state.status === 'playing') {
+    if (g.phase === 'playing') {
+      const curId = (g.order || [])[g.turnIndex];
+      if (curId === myId) {
+        const passLeft = (g.maxPasses || 0) - ((g.passes && g.passes[myId]) || 0);
+        const passDisabled = passLeft <= 0 ? ' disabled' : '';
+        el.innerHTML = '<div class="bid-row">'
+          + rollBtn('🎲 搖骰!')
+          + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️ 跳過 (剩 ${Math.max(0, passLeft)})</button>`
+          + '</div>';
+        $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
+      } else {
+        const nm = state.players.find((x) => x.id === curId);
+        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`;
+      }
+    } else {
+      el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
+    }
+    return;
   }
 
   if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'pickLoser') {
@@ -1031,11 +1112,13 @@ const rollSpin = { active: false, committing: false, timer: null };
 function rollDiceCount() {
   const g = state && state.game; if (!g) return 0;
   if (g.mode === 'roll') return g.diceCount || 3;
+  if (g.mode === 'roulette') return 1;
   return (g.diceLeft && g.diceLeft[myId]) || 0;
 }
 function myRollRegistered() {
   const g = state && state.game; if (!g) return true;
   if (g.mode === 'roll') return !!(g.rolls && g.rolls[myId]);
+  if (g.mode === 'roulette') return g.phase !== 'playing' || (g.order || [])[g.turnIndex] !== myId;
   return (g.rolled || []).includes(myId);
 }
 function canRollNow() {

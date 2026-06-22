@@ -38,7 +38,7 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 ### 遊戲模式介面(新增模式照這個寫)
 有兩種:
 - **簡單模式**(如 `rollMode`):`startRound(players, opts)`、`handleAction(game, player, action)`、`isRoundOver`/`finishRound`、`publicView(game, players)`、`privateView()`。
-- **整場模式 / match mode**(如 `liarsDice`、`mixedMode`):多了 `initMatch(players, startDice)`,函式簽名帶 `match`:`startRound(match, players)`、`handleAction(round, match, player, action, players)`、`isMatchOver`/`winner`、`publicView(round, match, players)`、`privateView(round, player)`。
+- **整場模式 / match mode**(如 `liarsDice`、`mixedMode`、`russianRoulette`):多了 `initMatch(players, startDice)`,函式簽名帶 `match`:`startRound(match, players)`、`handleAction(round, match, player, action, players)`、`isMatchOver`/`winner`、`publicView(round, match, players)`、`privateView(round, player)`。`russianRoulette` 是第一個**回合制**模式(輪流行動,非同時),在 `handleAction` 內以 `round.turnIndex` 驗證輪到的玩家。
 
 `gameController` 與 `viewFor` 都用 **`typeof mode.initMatch === 'function'`** 區分這兩類。回合流程由 `round.phase` 字串驅動(各模式自定,如 `rolling`/`choosing`/`condition`/`bluffReady`/`pokerCompare`/`reveal`/`roundEnd`);`gameController` 在 `phase === 'roundEnd'` 時判定整場結束並回大廳。
 

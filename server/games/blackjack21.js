@@ -25,7 +25,9 @@ export const blackjack21 = {
     const order = alive.map((p) => p.id);
     const hands = {};
     for (const id of order) {
-      hands[id] = { dice: [], total: 0, bust: false, stood: false };
+      const dice = [rollDie(), rollDie(), rollDie()];
+      const total = dice.reduce((s, v) => s + v, 0);
+      hands[id] = { dice, total, bust: false, stood: false };
     }
     return {
       phase: 'rolling',
@@ -144,7 +146,13 @@ function checkAllDone(round, match) {
     losers = busted;
   } else if (notBusted.length > 0) {
     const minTotal = Math.min(...notBusted.map((id) => round.hands[id].total));
-    losers = notBusted.filter((id) => round.hands[id].total === minTotal);
+    const tied = notBusted.filter((id) => round.hands[id].total === minTotal);
+    if (tied.length > 1) {
+      const minDice = Math.min(...tied.map((id) => round.hands[id].dice.length));
+      losers = tied.filter((id) => round.hands[id].dice.length === minDice);
+    } else {
+      losers = tied;
+    }
   } else {
     const maxTotal = Math.max(...round.order.map((id) => round.hands[id].total));
     losers = round.order.filter((id) => round.hands[id].total === maxTotal);

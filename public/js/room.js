@@ -245,6 +245,9 @@ function iNeedToRoll() {
   if (g.mode === 'roulette') {
     return g.phase === 'playing' && (g.order || [])[g.turnIndex] === myId;
   }
+  if (g.mode === 'blackjack21') {
+    return g.phase === 'rolling' && (g.order || [])[g.turnIndex] === myId;
+  }
   if (g.mode === 'liars' || g.mode === 'mixed') {
     return g.phase === 'rolling'
       && (g.order || []).includes(myId)
@@ -269,6 +272,7 @@ function currentLosers() {
   const g = state.game;
   if (!g || !g.reveal) return [];
   if (g.mode === 'roulette' && g.reveal.loserId) return [g.reveal.loserId];
+  if (g.mode === 'blackjack21' && g.reveal.losers) return g.reveal.losers;
   if (g.reveal.subGame === 'poker' && g.reveal.loserId) return [g.reveal.loserId];
   if (g.reveal.subGame === 'redblack' && (g.reveal.losers || []).length) return g.reveal.losers;
   if (!g.reveal.pending && (g.reveal.losers || []).length) return g.reveal.losers;
@@ -665,6 +669,33 @@ function renderBanner() {
     return;
   }
 
+  if (g && g.mode === 'blackjack21') {
+    if (state.winnerId) {
+      const w = state.players.find((p) => p.id === state.winnerId);
+      return show(`🏆 <strong>${esc(w ? w.name : '')}</strong> 獲勝!`);
+    }
+    if (state.status === 'playing' && g.phase === 'rolling') {
+      const curId = (g.order || [])[g.turnIndex];
+      const isMy = curId === myId;
+      const myTotal = g.myTotal ?? 0;
+      const pct = Math.min(100, Math.round((myTotal / 21) * 100));
+      const danger = pct >= 80 ? ' danger' : pct >= 60 ? ' warn' : '';
+      const totalHtml = g.myDice && g.myDice.length
+        ? `<span class="roulette-total${danger}">你的點數 <strong>${myTotal}</strong> / 21</span> ・ `
+        : '';
+      return show(
+        totalHtml
+        + (isMy ? '👉 <strong>輪到你!</strong> 要牌或停牌' : `⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`),
+      );
+    }
+    if (g.reveal && g.reveal.losers) {
+      const loserNames = g.reveal.losers.map((id) => `<span class="hl">${nm(id)}</span>`).join('、');
+      return show(`💀 ${loserNames} 輸了!`);
+    }
+    el.style.display = 'none'; el.innerHTML = '';
+    return;
+  }
+
   if (state.winnerId) {
     const w = state.players.find((p) => p.id === state.winnerId);
     el.innerHTML = `🏆 <strong>${esc(w ? w.name : '')}</strong> 獲勝!`;
@@ -880,6 +911,40 @@ function renderBoard() {
       } else {
         info.textContent = '';
       }
+    } else if (g.mode === 'blackjack21') {
+      const curId = (g.order || [])[g.turnIndex];
+      cell.classList.toggle('deciding', p.id === curId && g.phase === 'rolling');
+      // 生命顯示
+      const lives = (g.lives && g.lives[p.id]) || 0;
+      const hearts = lives > 0 ? '❤️'.repeat(lives) : '💀';
+      cell.querySelector('.cell-name').innerHTML =
+        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + ` <span class="roulette-lives">${hearts}</span>`;
+      cell.classList.toggle('eliminated', lives <= 0);
+
+      const hand = g.hands && g.hands[p.id];
+      if (!hand) { stage.innerHTML = ''; info.textContent = ''; }
+      else if (g.phase === 'rolling') {
+        if (p.id === myId && g.myDice && g.myDice.length) {
+          showDice(stage, 'cell-' + p.id, g.myDice);
+          info.textContent = `點數 ${g.myTotal}`;
+        } else if (hand.diceCount > 0) {
+          showDice(stage, 'cell-' + p.id, Array(hand.diceCount).fill(0), true);
+          info.textContent = hand.done ? '已停牌' : `${hand.diceCount} 顆骰`;
+        } else {
+          stage.innerHTML = '';
+          diceCache.delete('cell-' + p.id);
+          info.textContent = '';
+        }
+      } else {
+        // reveal / roundEnd: 全部翻開
+        if (hand.dice && hand.dice.length) {
+          showDice(stage, 'cell-' + p.id, hand.dice, false, true);
+          info.textContent = (hand.bust ? '💥 爆了! ' : '') + `點數 ${hand.total}`;
+        } else {
+          stage.innerHTML = '';
+          info.textContent = '';
+        }
+      }
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
       if (reveal && reveal.hands[p.id]) {
@@ -983,6 +1048,25 @@ function renderControls() {
       } else {
         const nm = state.players.find((x) => x.id === curId);
         el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`;
+      }
+    } else {
+      el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
+    }
+    return;
+  }
+
+  if (g.mode === 'blackjack21' && state.status === 'playing') {
+    if (g.phase === 'rolling') {
+      const curId = (g.order || [])[g.turnIndex];
+      if (curId === myId) {
+        el.innerHTML = '<div class="bid-row">'
+          + rollBtn('🎲 要牌')
+          + '<button id="bjStand" class="secondary">✋ 停牌</button>'
+          + '</div>';
+        $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+      } else {
+        const nm = state.players.find((x) => x.id === curId);
+        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`;
       }
     } else {
       el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
@@ -1108,17 +1192,19 @@ function esc(s) {
 }
 
 // ---- 按住搖骰:按住時骰子一直轉,放開才送出搖骰並停在結果 ----
-const rollSpin = { active: false, committing: false, timer: null };
+const rollSpin = { active: false, committing: false, timer: null, seqAtPress: -1 };
 function rollDiceCount() {
   const g = state && state.game; if (!g) return 0;
   if (g.mode === 'roll') return g.diceCount || 3;
   if (g.mode === 'roulette') return 1;
+  if (g.mode === 'blackjack21') return 1;
   return (g.diceLeft && g.diceLeft[myId]) || 0;
 }
 function myRollRegistered() {
   const g = state && state.game; if (!g) return true;
   if (g.mode === 'roll') return !!(g.rolls && g.rolls[myId]);
   if (g.mode === 'roulette') return g.phase !== 'playing' || (g.order || [])[g.turnIndex] !== myId;
+  if (g.mode === 'blackjack21') return g.phase !== 'rolling' || (g.actionSeq || 0) !== rollSpin.seqAtPress;
   return (g.rolled || []).includes(myId);
 }
 function canRollNow() {
@@ -1133,6 +1219,8 @@ function pressRoll(kind = 'roll') {
   if (rollSpin.active) return;
   if (kind === 'reroll' ? !canRerollNow() : !canRollNow()) return;
   rollSpin.active = true; rollSpin.committing = false; rollSpin.kind = kind;
+  const g0 = state && state.game;
+  rollSpin.seqAtPress = (g0 && g0.actionSeq) || 0;
   document.getElementById(kind === 'reroll' ? 'reroll' : 'roll')?.classList.add('charging'); // 蓄力視覺
   const cell = document.querySelector(`#board [data-pid="${myId}"]`);
   const stage = cell && cell.querySelector('.dice-stage');

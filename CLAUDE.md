@@ -38,7 +38,7 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 ### 遊戲模式介面(新增模式照這個寫)
 有兩種:
 - **簡單模式**(如 `rollMode`):`startRound(players, opts)`、`handleAction(game, player, action)`、`isRoundOver`/`finishRound`、`publicView(game, players)`、`privateView()`。
-- **整場模式 / match mode**(如 `liarsDice`、`mixedMode`、`russianRoulette`):多了 `initMatch(players, startDice)`,函式簽名帶 `match`:`startRound(match, players)`、`handleAction(round, match, player, action, players)`、`isMatchOver`/`winner`、`publicView(round, match, players)`、`privateView(round, player)`。`russianRoulette` 是第一個**回合制**模式(輪流行動,非同時),在 `handleAction` 內以 `round.turnIndex` 驗證輪到的玩家。
+- **整場模式 / match mode**(如 `liarsDice`、`mixedMode`、`russianRoulette`、`blackjack21`):多了 `initMatch(players, startDice)`,函式簽名帶 `match`:`startRound(match, players)`、`handleAction(round, match, player, action, players)`、`isMatchOver`/`winner`、`publicView(round, match, players)`、`privateView(round, player)`。`russianRoulette` 是第一個**回合制**模式(輪流行動,非同時),在 `handleAction` 內以 `round.turnIndex` 驗證輪到的玩家。`blackjack21`(21 點骰)同為回合制:輪流要牌(`hit`/`roll`)或停牌(`stand`),骰子加總接近 21 不爆;**暗骰**——他人只看到骰數不看點數,爆掉外觀與停牌相同(bluff 要素);全員結束後開牌,爆掉者輸、全沒爆最低分輸、全爆超最多者輸;淘汰制 3 命。前端用 `actionSeq` 偵測搖骰結果已回(解決 turn 繞回自己時骰子不停的問題)。
 
 `gameController` 與 `viewFor` 都用 **`typeof mode.initMatch === 'function'`** 區分這兩類。回合流程由 `round.phase` 字串驅動(各模式自定,如 `rolling`/`choosing`/`condition`/`bluffReady`/`pokerCompare`/`reveal`/`roundEnd`);`gameController` 在 `phase === 'roundEnd'` 時判定整場結束並回大廳。
 

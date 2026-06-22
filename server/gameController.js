@@ -54,13 +54,12 @@ export function startRound(room, playerId) {
   // 觀戰者於每輪開始時併入
   mergeSpectators(room);
 
-  if (mode.id === 'roulette') {
+  if (mode.id === 'roulette' || mode.id === 'blackjack21') {
     if (!room.match || room.matchOver) {
-      room.match = mode.initMatch(room.players, {
-        lives: room.rouletteLives || 3,
-        bustThreshold: room.rouletteBust || 21,
-        maxPasses: room.roulettePasses ?? 1,
-      });
+      const opts = mode.id === 'roulette'
+        ? { lives: room.rouletteLives || 3, bustThreshold: room.rouletteBust || 21, maxPasses: room.roulettePasses ?? 1 }
+        : { lives: room.blackjackLives || 3 };
+      room.match = mode.initMatch(room.players, opts);
       room.matchOver = false;
       room.winnerId = null;
     } else {
@@ -128,12 +127,12 @@ export function handleAction(room, player, action) {
   } else if (isMatchMode(mode)) {
     if (room.round.phase === 'roundEnd') {
       // 吹牛骰/輪盤骰:每一輪就計一次「輸的次數」(非整場結束才算)
-      if (mode.id === 'liars' || mode.id === 'roulette') recordRoundLosers(room);
+      if (mode.id === 'liars' || mode.id === 'roulette' || mode.id === 'blackjack21') recordRoundLosers(room);
       if (mode.isMatchOver(room.match, room.players)) {
         room.matchOver = true;
         const w = mode.winner(room.match, room.players);
         room.winnerId = w ? w.id : null;
-        if (mode.id !== 'liars' && mode.id !== 'roulette') recordLosses(room); // 吹牛骰/輪盤骰已每輪計過
+        if (mode.id !== 'liars' && mode.id !== 'roulette' && mode.id !== 'blackjack21') recordLosses(room);
       }
       room.status = 'lobby'; // 等房主開下一輪 / 或整場已結束
     }
@@ -218,13 +217,12 @@ export function onPlayerLeft(room, leftId) {
       const r = room.round;
       if (pruneRoundMember(r, leftId) && r.order.length === 0) room.status = 'lobby';
       finishIfMatchOver(room, mode);
-    } else if (mode.id === 'roulette') {
+    } else if (mode.id === 'roulette' || mode.id === 'blackjack21') {
       const r = room.round;
       if (pruneRoundMember(r, leftId)) {
         if (r.order.length === 0) {
           room.status = 'lobby';
         } else {
-          // 離場者是當前行動者 → 修正 turnIndex
           if (r.turnIndex >= r.order.length) r.turnIndex = r.turnIndex % r.order.length;
         }
       }

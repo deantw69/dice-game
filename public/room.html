@@ -20,6 +20,7 @@
           <label id="autoNextWrap" class="auto-next" style="display:none"><input type="checkbox" id="autoNext"/> 自動下一場</label>
           <label class="auto-roll" title="搖骰環節自動骰,不用按"><input type="checkbox" id="autoRoll"/> 自動骰</label>
           <label id="shakeRollWrap" class="auto-roll" style="display:none" title="搖晃手機即可擲骰(等同按住搖、停下定)"><input type="checkbox" id="shakeRoll"/> 📱 搖手機擲骰</label>
+          <button id="shareQr" class="mini secondary" type="button" title="分享房間 QR Code">📷 分享</button>
           <button id="muteToggle" class="mini secondary" type="button" title="音效開關">🔊</button>
           <button id="forceReset" class="mini danger" style="display:none">🔄 強制重來</button>
           <button id="benchSelf" class="secondary mini" style="display:none" title="暫時離開,不參與下一輪;按「我回來了」才回歸">💤 我要暫離</button>
@@ -44,6 +45,18 @@
       <div id="rosterBody"></div>
     </aside>
     <button id="rosterOpen" class="roster-open" type="button" title="顯示玩家列表" style="display:none">👥 玩家</button>
+  </div>
+
+  <!-- 分享房間 QR Code overlay(點背景或關閉鈕關閉) -->
+  <div id="qrOverlay" class="qr-overlay" style="display:none">
+    <div class="qr-box">
+      <button id="qrClose" class="mini secondary qr-close" type="button" title="關閉">✕</button>
+      <h3 class="qr-title">掃描加入房間</h3>
+      <canvas id="qrCanvas" class="qr-canvas" width="264" height="264"></canvas>
+      <p class="qr-code-line">房號 <strong id="qrCode">····</strong></p>
+      <p class="qr-hint">用另一台手機相機掃描,開啟後輸入暱稱即可加入</p>
+      <p class="qr-url muted" id="qrUrl"></p>
+    </div>
   </div>
 
   <!-- 本局輸家 popup(置中浮現,下一場開始自動消失;pointer-events:none 不擋按鈕) -->

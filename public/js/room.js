@@ -3,6 +3,7 @@ import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
 import { createRenderer as createCup } from './dice/diceCup.js';
 import { playAlert, playFanfare, playRattle } from './dice/cupSound.js';
+import { makeQrMatrix } from './vendor/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -1143,6 +1144,40 @@ $('copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(code); toast('已複製房號 ' + code, 'success'); }
   catch { toast('房號:' + code, 'info'); }
 });
+// 分享房間 QR Code:把「首頁帶房號」網址畫成 QR,他人掃描後自動填好房號,只需輸入暱稱
+function drawQr(text) {
+  const canvas = $('qrCanvas');
+  const matrix = makeQrMatrix(text);
+  const n = matrix.length;
+  const quiet = 4;                       // QR 規格建議的留白邊框
+  const total = n + quiet * 2;
+  const px = Math.max(1, Math.floor(canvas.width / total));
+  const size = (total) * px;
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      if (matrix[y][x]) ctx.fillRect((x + quiet) * px, (y + quiet) * px, px, px);
+}
+function openQr() {
+  const url = `${location.origin}/?code=${encodeURIComponent(code)}`;
+  $('qrCode').textContent = code;
+  $('qrUrl').textContent = url;
+  try { drawQr(url); }
+  catch { toast('產生 QR 失敗', 'error'); return; }
+  $('qrOverlay').style.display = 'flex';
+}
+function closeQr() { $('qrOverlay').style.display = 'none'; }
+$('shareQr').addEventListener('click', () => {
+  document.querySelector('.room-top')?.classList.remove('menu-open'); // 收起手機選單
+  openQr();
+});
+$('qrClose').addEventListener('click', closeQr);
+$('qrOverlay').addEventListener('click', (e) => { if (e.target === $('qrOverlay')) closeQr(); });
+
 $('leave').addEventListener('click', async () => {
   await emit('leaveRoom', {});
   clearSession();

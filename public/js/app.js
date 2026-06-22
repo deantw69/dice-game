@@ -18,6 +18,14 @@ nameInput.value = localStorage.getItem(NAME_KEY) || '';
 codeInput.value = localStorage.getItem(CODE_KEY) || '';
 customCodeInput.value = localStorage.getItem(CUSTOM_CODE_KEY) || '';
 
+// 掃 QR 進來:網址帶 ?code=XXXX → 自動填房號、聚焦暱稱,只需輸入名稱即可加入
+const urlCode = (new URLSearchParams(location.search).get('code') || '').trim().toUpperCase();
+if (urlCode) {
+  codeInput.value = urlCode;
+  localStorage.setItem(CODE_KEY, urlCode);
+  setTimeout(() => { nameInput.focus(); }, 0);
+}
+
 // 即時記憶
 nameInput.addEventListener('input', () => localStorage.setItem(NAME_KEY, nameInput.value.trim()));
 codeInput.addEventListener('input', () => localStorage.setItem(CODE_KEY, codeInput.value.trim().toUpperCase()));

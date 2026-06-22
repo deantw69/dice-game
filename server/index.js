@@ -111,9 +111,8 @@ io.on('connection', (socket) => {
     if (!room) return cb?.({ error: '尚未加入房間' });
     const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
-    room.rouletteBust = Math.max(10, Math.min(50, parseInt(value) || 21));
+    // rouletteBust 已改為每回合隨機隱藏,保留事件但不動作
     cb?.({ ok: true });
-    broadcastRoom(room);
   });
 
   socket.on('setRoulettePasses', ({ value }, cb) => {

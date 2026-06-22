@@ -1,19 +1,31 @@
-// 俄羅斯輪盤骰:輪流搖 1 顆骰,累加總和,超過門檻就爆掉扣命,最後活著的贏
+// 俄羅斯輪盤骰:輪流搖 1 顆骰,累加總和,超過隱藏門檻就爆掉扣命,最後活著的贏
 import { rollDice } from '../util/rng.js';
+
+// 依存活人數動態產生爆掉門檻範圍,每回合隨機取值
+// min = playerCount * 5, max = playerCount * 10
+function bustRange(playerCount) {
+  const min = playerCount * 5;
+  const max = playerCount * 10;
+  return { min, max };
+}
+
+function randomBust(playerCount) {
+  const { min, max } = bustRange(playerCount);
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
 
 export const russianRoulette = {
   id: 'roulette',
   name: '俄羅斯輪盤骰',
   minPlayers: 2,
 
-  initMatch(players, { lives = 3, bustThreshold = 21, maxPasses = 1 } = {}) {
+  initMatch(players, { lives = 3, maxPasses = 1 } = {}) {
     const l = {};
     for (const p of players) l[p.id] = lives;
     return {
       lives: l,
       eliminated: [],
       startLives: lives,
-      bustThreshold,
       maxPasses,
       nextStarter: null,
     };
@@ -24,6 +36,8 @@ export const russianRoulette = {
       (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
     );
     const order = alive.map((p) => p.id);
+    const range = bustRange(order.length);
+    const bustThreshold = randomBust(order.length);
 
     let turnIndex = 0;
     if (match.nextStarter && order.includes(match.nextStarter)) {
@@ -38,6 +52,8 @@ export const russianRoulette = {
       order,
       turnIndex,
       total: 0,
+      bustThreshold,
+      bustRange: range,
       passes,
       lastRoll: null,
       history: [],
@@ -59,7 +75,7 @@ export const russianRoulette = {
       round.lastRoll = { playerId: player.id, value };
       round.history.push({ playerId: player.id, action: 'roll', value, total: round.total });
 
-      if (round.total > match.bustThreshold) {
+      if (round.total > round.bustThreshold) {
         round.bustPlayer = player.id;
         match.lives[player.id] = Math.max(0, (match.lives[player.id] || 0) - 1);
         if (match.lives[player.id] <= 0 && !match.eliminated.includes(player.id)) {
@@ -109,7 +125,9 @@ export const russianRoulette = {
       order: round.order,
       turnIndex: round.turnIndex,
       total: round.total,
-      bustThreshold: match.bustThreshold,
+      bustRange: round.bustRange,
+      // 爆掉後才揭曉門檻,遊戲中隱藏
+      bustThreshold: round.bustPlayer ? round.bustThreshold : null,
       maxPasses: match.maxPasses,
       passes: round.passes,
       lastRoll: round.lastRoll,

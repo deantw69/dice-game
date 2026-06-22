@@ -569,8 +569,6 @@ function renderLobby() {
   if (state.modeId === 'roulette') {
     html += `<div class="lobby-row"><span class="label">每人生命</span>
       <input id="rouletteLives" type="number" min="1" max="10" value="${state.rouletteLives}" /></div>`;
-    html += `<div class="lobby-row"><span class="label">爆掉門檻</span>
-      <input id="rouletteBust" type="number" min="10" max="50" value="${state.rouletteBust}" /></div>`;
     html += `<div class="lobby-row"><span class="label">每輪可跳過</span>
       <input id="roulettePasses" type="number" min="0" max="3" value="${state.roulettePasses}" /></div>`;
   }
@@ -599,7 +597,6 @@ function renderLobby() {
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
   $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
   $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
-  $('rouletteBust')?.addEventListener('change', (e) => act('setRouletteBust', { value: e.target.value }));
   $('roulettePasses')?.addEventListener('change', (e) => act('setRoulettePasses', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
@@ -702,10 +699,12 @@ function renderBanner() {
     if (state.status === 'playing' && g.phase === 'playing') {
       const curId = (g.order || [])[g.turnIndex];
       const isMy = curId === myId;
-      const pct = Math.min(100, Math.round((g.total / g.bustThreshold) * 100));
-      const danger = pct >= 80 ? ' danger' : pct >= 60 ? ' warn' : '';
+      const range = g.bustRange || {};
+      const danger = g.total >= (range.max || 99) ? ' danger'
+        : g.total >= (range.min || 99) ? ' warn' : '';
+      const rangeHint = range.min ? ` <small>(${range.min}~${range.max})</small>` : '';
       return show(
-        `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ${g.bustThreshold}</span>`
+        `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ???${rangeHint}</span>`
         + (isMy ? ' ・ 👉 <strong>輪到你!</strong>' : ` ・ ⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`),
       );
     }

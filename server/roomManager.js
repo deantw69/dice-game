@@ -241,7 +241,6 @@ export function viewFor(room, viewerId) {
     autoRotate: !!room.autoRotate,
     blackjackLives: room.blackjackLives ?? 3,
     rouletteLives: room.rouletteLives || 3,
-    rouletteBust: room.rouletteBust || 21,
     roulettePasses: room.roulettePasses ?? 1,
     modes: MODE_LIST,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

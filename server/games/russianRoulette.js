@@ -32,9 +32,11 @@ export const russianRoulette = {
   },
 
   startRound(match, players) {
-    const alive = players.filter(
-      (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
-    );
+    const alive = match.startLives === 0
+      ? players
+      : players.filter(
+          (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
+        );
     const order = alive.map((p) => p.id);
     const range = bustRange(order.length);
     const bustThreshold = randomBust(order.length);
@@ -77,9 +79,11 @@ export const russianRoulette = {
 
       if (round.total > round.bustThreshold) {
         round.bustPlayer = player.id;
-        match.lives[player.id] = Math.max(0, (match.lives[player.id] || 0) - 1);
-        if (match.lives[player.id] <= 0 && !match.eliminated.includes(player.id)) {
-          match.eliminated.push(player.id);
+        if (match.startLives > 0) {
+          match.lives[player.id] = Math.max(0, (match.lives[player.id] || 0) - 1);
+          if (match.lives[player.id] <= 0 && !match.eliminated.includes(player.id)) {
+            match.eliminated.push(player.id);
+          }
         }
         match.nextStarter = player.id;
         round.reveal = { loserId: player.id };
@@ -111,10 +115,12 @@ export const russianRoulette = {
   finishRound(_round, _players) {},
 
   isMatchOver(match, players) {
+    if (match.startLives === 0) return true;
     return players.filter((p) => (match.lives[p.id] || 0) > 0).length <= 1;
   },
 
   winner(match, players) {
+    if (match.startLives === 0) return null;
     const alive = players.filter((p) => (match.lives[p.id] || 0) > 0);
     return alive.length === 1 ? alive[0] : null;
   },

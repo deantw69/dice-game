@@ -57,7 +57,7 @@ export function startRound(room, playerId) {
   if (mode.id === 'roulette' || mode.id === 'blackjack21') {
     if (!room.match || room.matchOver) {
       const opts = mode.id === 'roulette'
-        ? { lives: room.rouletteLives || 3, maxPasses: room.roulettePasses ?? 1 }
+        ? { lives: room.rouletteLives ?? 3, maxPasses: room.roulettePasses ?? 1 }
         : { lives: room.blackjackLives ?? 3 };
       room.match = mode.initMatch(room.players, opts);
       room.matchOver = false;

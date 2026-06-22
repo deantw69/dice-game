@@ -568,7 +568,8 @@ function renderLobby() {
   }
   if (state.modeId === 'roulette') {
     html += `<div class="lobby-row"><span class="label">每人生命</span>
-      <input id="rouletteLives" type="number" min="1" max="10" value="${state.rouletteLives}" /></div>`;
+      <input id="rouletteLives" type="number" min="0" max="10" value="${state.rouletteLives}" /></div>`;
+    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
     html += `<div class="lobby-row"><span class="label">每輪可跳過</span>
       <input id="roulettePasses" type="number" min="0" max="3" value="${state.roulettePasses}" /></div>`;
   }
@@ -936,13 +937,13 @@ function renderBoard() {
     } else if (g.mode === 'roulette') {
       const curId = (g.order || [])[g.turnIndex];
       cell.classList.toggle('deciding', p.id === curId && g.phase === 'playing');
-      // 生命顯示
+      // 生命顯示（單局模式 startLives=0 不顯示生命、不灰掉）
+      const singleRound = state.rouletteLives === 0;
       const lives = (g.lives && g.lives[p.id]) || 0;
-      const hearts = lives > 0 ? '❤️'.repeat(lives) : '💀';
+      const hearts = singleRound ? '' : (lives > 0 ? '❤️'.repeat(lives) : '💀');
       cell.querySelector('.cell-name').innerHTML =
-        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + ` <span class="roulette-lives">${hearts}</span>`;
-      // 淘汰玩家灰階
-      cell.classList.toggle('eliminated', lives <= 0);
+        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + (hearts ? ` <span class="roulette-lives">${hearts}</span>` : '');
+      cell.classList.toggle('eliminated', !singleRound && lives <= 0);
 
       if (g.lastRoll && g.lastRoll.playerId === p.id) {
         showDice(stage, 'cell-' + p.id, [g.lastRoll.value]);

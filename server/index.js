@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
     if (!room) return cb?.({ error: '尚未加入房間' });
     const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
-    room.rouletteLives = Math.max(1, Math.min(10, parseInt(value) || 3));
+    room.rouletteLives = Math.max(0, Math.min(10, parseInt(value) || 0));
     cb?.({ ok: true });
     broadcastRoom(room);
   });

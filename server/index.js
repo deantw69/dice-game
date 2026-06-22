@@ -39,7 +39,8 @@ function broadcastRoom(room) {
 io.on('connection', (socket) => {
   console.log(`[socket] connected: ${socket.id}`);
 
-  socket.on('listRooms', (cb) => {
+  socket.on('listRooms', (_payload, cb) => {
+    // 前端 emit('listRooms') 經 net.js 會送出 (undefined, ack),cb 在第二位
     cb?.({ rooms: rm.getRoomList() });
   });
 

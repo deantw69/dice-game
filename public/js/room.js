@@ -1275,7 +1275,7 @@ function renderControls() {
         const first = !((g.myDice || []).length);
         el.innerHTML = '<div class="bid-row">'
           + `<button id="speedReroll">🎲 ${first ? '搖骰!' : '重骰(未鎖的)'}</button>`
-          + '</div>' + (first ? '' : '<p class="hint muted">點骰子可鎖定不重骰</p>');
+          + '</div>' + `<p class="hint muted"${first ? ' style="visibility:hidden"' : ''}>點骰子可鎖定不重骰</p>`;
         $('speedReroll')?.addEventListener('click', () => act('action', { type: 'reroll' }));
       }
     } else {

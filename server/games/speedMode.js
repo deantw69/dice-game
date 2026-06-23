@@ -9,6 +9,7 @@ import { rollDice } from '../util/rng.js';
 import { evalHand } from '../util/pokerHand.js';
 
 const REVEAL_DELAY_MS = 3000;        // 倒數 3-2-1
+const ROLL_COOLDOWN_MS = 1000;       // 連續擲骰最小間隔(限制快速連按;伺服器權威)
 const DEFAULT_SECONDS = 30;
 const MIN_SECONDS = 10;
 const MAX_SECONDS = 60;
@@ -43,6 +44,7 @@ export const speedMode = {
       locked: {},                     // playerId -> [鎖定索引]
       done: [],                       // 已達標的 playerId(順序即達標名次)
       doneAt: {},                     // playerId -> 達標時間
+      lastRollAt: {},                 // playerId -> 上次擲骰時間(連續擲骰冷卻用)
       reveal: null,                   // roundEnd 後:{ losers }
       rolls: {},                      // playerId -> 已搖次數(前端據此觸發骰子動畫)
       speedId: ++speedSeq,            // 過期計時器自我失效用
@@ -71,6 +73,13 @@ export const speedMode = {
     }
 
     if (action.type === 'reroll') {
+      // 連續擲骰冷卻:距上次擲骰未滿 1.5 秒則拒絕(伺服器權威,防快速連按)
+      const now = Date.now();
+      const since = now - (round.lastRollAt[player.id] || 0);
+      if (since < ROLL_COOLDOWN_MS) {
+        return { ok: true, cooldown: true, retryMs: ROLL_COOLDOWN_MS - since };
+      }
+      round.lastRollAt[player.id] = now;
       const locked = (round.locked[player.id] || []).filter((x) => Number.isInteger(x));
       const cur = round.dice[player.id] || rollDice(5);
       const fresh = rollDice(5);
@@ -115,6 +124,7 @@ export const speedMode = {
     delete round.dice[leftId];
     delete round.locked[leftId];
     delete round.rolls[leftId];
+    delete round.lastRollAt[leftId];
     return true;
   },
 

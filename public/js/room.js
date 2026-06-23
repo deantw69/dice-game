@@ -35,6 +35,8 @@ let prevSpeedPhase = null;    // 手速骰:上次 render 的 phase(用來偵測 
 let speedClockTimer = null;   // 手速骰:本地倒數/計時 interval
 let speedSkew = 0;            // 手速骰:client 與 server 的時鐘偏移(Date.now() - serverNow)
 let speedLastMyRolls = 0;     // 手速骰:上次 render 時自己的搖骰次數(用來在「我剛搖完」時播骰子動畫)
+let speedRollReadyAt = 0;     // 手速骰:下次可擲骰的時間(連續擲骰冷卻 1.5 秒,前端同步顯示)
+let speedCooldownTimer = null;// 手速骰:冷卻倒數的 re-render 計時器
 let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
 let loserDismissedKey = '';   // 已被使用者點掉的輸家 popup(同一場不再顯示)
 let lastStatsKey = '';        // 吹牛開盅各點數統計 popup 的內容簽章
@@ -84,6 +86,7 @@ function toast(msg, type = 'error') {
 async function act(event, payload) {
   const res = await emit(event, payload);
   if (res.error) toast(res.error);
+  return res;
 }
 
 // 搖骰鈕:長按機制見 pressRoll/releaseRoll(提示只放 title tooltip,不佔版面)
@@ -721,6 +724,15 @@ function setupSpeedClock() {
   tick();
 }
 
+// 手速骰冷卻:倒數期間每 100ms 重畫搖骰鈕(顯示剩餘秒數),到時自動解鎖
+function scheduleSpeedCooldownRender() {
+  if (speedCooldownTimer) return;
+  speedCooldownTimer = setInterval(() => {
+    if (Date.now() >= speedRollReadyAt) { clearInterval(speedCooldownTimer); speedCooldownTimer = null; }
+    if (state) render();
+  }, 100);
+}
+
 function renderBanner() {
   const el = $('banner');
   const g = state.game;
@@ -1100,7 +1112,7 @@ function renderBoard() {
         stage.innerHTML = '<div class="waiting">準備…</div>';
         diceCache.delete('cell-' + p.id);
         info.textContent = '';
-        if (p.id === myId) speedLastMyRolls = 0; // 新一局:重置動畫計數
+        if (p.id === myId) { speedLastMyRolls = 0; speedRollReadyAt = 0; } // 新一局:重置動畫計數與冷卻
       } else if (p.id === myId && !ended) {
         // 自己:活骰,可點選鎖定;重骰由 controls 的按鈕送出
         const dice = g.myDice || [];
@@ -1273,10 +1285,21 @@ function renderControls() {
         el.innerHTML = '<p class="muted">✅ 你已達標安全!等待其他人…</p>';
       } else {
         const first = !((g.myDice || []).length);
+        const wait = Math.max(0, speedRollReadyAt - Date.now());
+        const onCd = wait > 0;
+        const label = onCd ? `⏳ ${(wait / 1000).toFixed(1)}s` : `🎲 ${first ? '搖骰!' : '重骰(未鎖的)'}`;
         el.innerHTML = '<div class="bid-row">'
-          + `<button id="speedReroll">🎲 ${first ? '搖骰!' : '重骰(未鎖的)'}</button>`
+          + `<button id="speedReroll"${onCd ? ' disabled' : ''}>${label}</button>`
           + '</div>' + `<p class="hint muted"${first ? ' style="visibility:hidden"' : ''}>點骰子可鎖定不重骰</p>`;
-        $('speedReroll')?.addEventListener('click', () => act('action', { type: 'reroll' }));
+        $('speedReroll')?.addEventListener('click', () => {
+          if (Date.now() < speedRollReadyAt) return;
+          speedRollReadyAt = Date.now() + 1000;            // 樂觀冷卻;以伺服器回應為準
+          act('action', { type: 'reroll' }).then((res) => {
+            // 伺服器拒絕(冷卻未到)→ 以伺服器剩餘時間校正
+            if (res && res.cooldown && res.retryMs) speedRollReadyAt = Date.now() + res.retryMs;
+          });
+          scheduleSpeedCooldownRender();
+        });
       }
     } else {
       el.innerHTML = '<p class="muted">本局結束,等待房主開下一局…</p>';

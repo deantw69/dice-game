@@ -502,6 +502,18 @@ button.danger:hover { filter: brightness(1.08); }
 .rank-popup .rank-card h3 { margin: 0 0 10px; font-size: 1.05rem; }
 .rank-popup .rank-list { margin: 0; padding-left: 1.4em; line-height: 1.8; }
 .rank-popup .rank-list b { color: var(--accent); }
+.rank-popup .rank-card p { margin: 8px 0; line-height: 1.7; }
+.rank-popup .rank-card .muted { color: var(--muted); font-size: 0.9em; }
+/* 左下角模式規則 info icon */
+.mode-info-btn {
+  position: fixed; left: 14px; bottom: 14px; z-index: 55;
+  width: 40px; height: 40px; padding: 0; border-radius: 50%;
+  font-size: 1.2rem; line-height: 1; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.mode-info-btn:hover { border-color: var(--accent); }
+@media (max-width: 600px) { .mode-info-btn { width: 36px; height: 36px; font-size: 1.05rem; left: 10px; bottom: 10px; } }
 /* 吹牛開盅各點數統計 popup */
 .stats-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .stats-popup .stats-card {

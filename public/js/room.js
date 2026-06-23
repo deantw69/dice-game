@@ -224,6 +224,7 @@ function render() {
   renderBoard();                          // 骰子動畫照常播放
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
   renderPokerGuide();
+  renderModeInfo();
   if (!pokerRerollAnim) renderLoserBanner(); // 重骰動畫期間先別跳輸家公告(等動畫停再顯示)
   renderWinnerBanner();
   renderBluffStats();
@@ -481,6 +482,51 @@ function renderPokerGuide() {
 // 點牌型表以外的地方 → 關閉
 $('pokerRankPopup')?.addEventListener('click', (e) => {
   if (!e.target.closest || !e.target.closest('.rank-card')) setPokerRankPopup(false);
+});
+
+// 各模式規則說明:左下角 info icon → 點了彈出 popup(僅這幾個模式有)
+const MODE_RULES = {
+  roulette: `<div class="rank-card">
+    <h3>🔫 俄羅斯輪盤骰</h3>
+    <p>輪流行動的<b>淘汰制</b>骰子遊戲。每回合會隨機產生一個隱藏的「爆掉門檻」,你只看得到可能範圍。</p>
+    <p>輪到你時擲骰,點數會累加進總和。總和一旦超過門檻就<b>爆掉</b>,當回合你輸、扣一條命。</p>
+    <p>門檻範圍依存活人數決定(最小 = 人數×5,最大 = 人數×10),爆掉後才揭曉實際門檻。</p>
+    <p class="muted">生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。命歸零者被淘汰,最後存活者獲勝。</p>
+  </div>`,
+  blackjack21: `<div class="rank-card">
+    <h3>🎲 21 點骰</h3>
+    <p>輪流行動的<b>淘汰制</b>遊戲,目標是讓骰子點數總和<b>接近但不超過 21</b>。</p>
+    <p>開局自動骰 3 顆起手,之後輪到你時可「要骰」(再骰一顆)或「停牌」。</p>
+    <p><b>暗骰</b>:別人只看得到你骰了幾顆、看不到點數;爆掉的外觀和停牌一樣(可虛張聲勢)。</p>
+    <p>全員結束後開牌:爆掉者輸;全沒爆則最低分者輸(同分時骰子數多者贏);全爆則超過最多者輸。</p>
+    <p class="muted">生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。最後存活者為最終勝利者。</p>
+  </div>`,
+  speed: `<div class="rank-card">
+    <h3>⚡ 手速骰</h3>
+    <p>即時競速模式,每人 5 顆骰。倒數 3 秒後揭題,指定一個<b>撲克牌型</b>(須剛好湊到該牌型,不是「以上」)。</p>
+    <p>揭題後各自按「搖骰」開始,可無限重骰、各自獨立鎖骰。連續擲骰有 1 秒冷卻。</p>
+    <p>搶先湊到指定牌型即<b>安全</b>。只剩 1 人未達標就立刻結束、該人輸;時間到仍有 2 人以上未達標,則未達標者全輸。</p>
+    <p class="muted">為單局制(每局結束回大廳,無最終勝利者)。秒數由房主設定(預設 30,範圍 10~60)。</p>
+  </div>`,
+};
+let modeInfoOpen = false;
+function setModeInfoPopup(open) {
+  modeInfoOpen = open;
+  const pop = $('modeInfoPopup');
+  if (!pop) return;
+  if (open) pop.innerHTML = MODE_RULES[state.modeId] || '';
+  pop.style.display = open ? 'flex' : 'none';
+}
+function renderModeInfo() {
+  const btn = $('modeInfoBtn');
+  if (!btn) return;
+  const show = !!MODE_RULES[state.modeId];
+  btn.style.display = show ? '' : 'none';
+  if (!show && modeInfoOpen) setModeInfoPopup(false);
+}
+$('modeInfoBtn')?.addEventListener('click', () => setModeInfoPopup(!modeInfoOpen));
+$('modeInfoPopup')?.addEventListener('click', (e) => {
+  if (!e.target.closest || !e.target.closest('.rank-card')) setModeInfoPopup(false);
 });
 
 function renderRoster() {

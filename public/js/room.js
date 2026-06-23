@@ -38,6 +38,8 @@ let speedSkew = 0;            // 手速骰:client 與 server 的時鐘偏移(Dat
 let speedLastMyRolls = 0;     // 手速骰:上次 render 時自己的搖骰次數(用來在「我剛搖完」時播骰子動畫)
 let speedRollReadyAt = 0;     // 手速骰:下次可擲骰的時間(連續擲骰冷卻 1.5 秒,前端同步顯示)
 let speedCooldownTimer = null;// 手速骰:冷卻倒數的 re-render 計時器
+let speedRolling = false;     // 手速骰:骰子動畫是否進行中(延遲達標顯示)
+let speedRollingTimer = null; // 手速骰:動畫結束計時器
 let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
 let loserDismissedKey = '';   // 已被使用者點掉的輸家 popup(同一場不再顯示)
 let lastStatsKey = '';        // 吹牛開盅各點數統計 popup 的內容簽章
@@ -1160,7 +1162,7 @@ function renderBoard() {
         stage.innerHTML = '<div class="waiting">準備…</div>';
         diceCache.delete('cell-' + p.id);
         info.textContent = '';
-        if (p.id === myId) { speedLastMyRolls = 0; speedRollReadyAt = 0; } // 新一局:重置動畫計數與冷卻
+        if (p.id === myId) { speedLastMyRolls = 0; speedRollReadyAt = 0; speedRolling = false; clearTimeout(speedRollingTimer); } // 新一局:重置
       } else if (p.id === myId && !ended) {
         // 自己:活骰,可點選鎖定;重骰由 controls 的按鈕送出
         const dice = g.myDice || [];
@@ -1172,12 +1174,18 @@ function renderBoard() {
             const rollIdx = dice.map((_, i) => i).filter((i) => !lockedSet.has(i));
             showDice(stage, 'cell-' + p.id, dice, false, false, rollIdx);
             speedLastMyRolls = myRolls;
+            // 動畫進行中:延遲達標顯示
+            speedRolling = true;
+            clearTimeout(speedRollingTimer);
+            speedRollingTimer = setTimeout(() => { speedRolling = false; render(); }, 1500);
           } else {
             showDice(stage, 'cell-' + p.id, dice, false, true); // 非本人觸發的 render:靜態保留
           }
           applyLockUI(stage, g.myLocked || [], g.phase === 'racing' && !isDone);
         }
-        info.innerHTML = isDone
+        const showDone = isDone && !speedRolling;
+        cell.classList.toggle('done-safe', showDone && !ended);
+        info.innerHTML = showDone
           ? `<span class="speed-badge ok">✅ 安全 #${rank}</span>`
           : '<span class="speed-badge go">⏳ 搶骰中</span>';
       } else {
@@ -1329,9 +1337,9 @@ function renderControls() {
       return;
     }
     if (g.phase === 'racing') {
-      if ((g.done || []).includes(myId)) {
+      if ((g.done || []).includes(myId) && !speedRolling) {
         el.innerHTML = '<p class="muted">✅ 你已達標安全!等待其他人…</p>';
-      } else {
+      } else if (!(g.done || []).includes(myId) || speedRolling) {
         const first = !((g.myDice || []).length);
         const wait = Math.max(0, speedRollReadyAt - Date.now());
         const onCd = wait > 0;

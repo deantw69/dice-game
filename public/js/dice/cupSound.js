@@ -55,6 +55,24 @@ export function playAlert() {
   beep(t + 0.16, 1175); // 第二聲(higher)
 }
 
+// 倒數「督」聲:短促低沉的提示音(手速骰 3-2-1 倒數用)
+export function playCountdownTick() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return;
+  const ac = ctx();
+  if (!ac) return;
+  const t = ac.currentTime;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.value = 440;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  o.connect(g).connect(ac.destination);
+  o.start(t);
+  o.stop(t + 0.18);
+}
+
 // 嘲諷用的歡樂小號:決出輸家時播(上行 C-E-G-C)
 export function playFanfare() {
   if (typeof window !== 'undefined' && window.__cupMuted) return; // 靜音

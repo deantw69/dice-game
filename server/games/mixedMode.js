@@ -22,7 +22,7 @@ const CONDITIONS = {
 
 export const mixedMode = {
   id: 'mixed',
-  name: '混合模式',
+  name: '三合一',
   minPlayers: 2,
   implemented: true,
   startDice: START_DICE,

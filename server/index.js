@@ -135,6 +135,16 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  socket.on('setSpeedSeconds', ({ value }, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
+    room.speedSeconds = Math.max(10, Math.min(60, parseInt(value) || 30));
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   socket.on('setLoserDecides', ({ on }, cb) => {
     const room = rm.findRoomBySocket(socket.id);
     if (!room) return cb?.({ error: '尚未加入房間' });
@@ -186,6 +196,7 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
     broadcastRoom(room);
+    if (room.modeId === 'speed') armSpeedTimers(room); // 手速骰:排程揭題/截止計時器
   });
 
   socket.on('action', (action, cb) => {
@@ -306,6 +317,30 @@ io.on('connection', (socket) => {
     broadcastRoom(room); // 立即反映「離線」狀態
   });
 });
+
+// 手速骰計時器:T1 揭題(targetAt)、T2 截止(deadlineAt)。
+// 用 round.speedId 當 nonce —— 回呼觸發時若該局已換新/結束,phase/nonce/status 驗證會讓它自動 no-op,
+// 因此不必在每條離開/重來路徑手動清除計時器。
+function armSpeedTimers(room) {
+  const round = room.round;
+  if (!round || room.modeId !== 'speed') return;
+  const id = round.speedId;
+  const now = Date.now();
+
+  setTimeout(() => {
+    const r = room.round;
+    if (!r || r.speedId !== id || room.status !== 'playing' || r.phase !== 'countdown') return;
+    gc.speedReveal(room);
+    broadcastRoom(room);
+  }, Math.max(0, round.targetAt - now));
+
+  setTimeout(() => {
+    const r = room.round;
+    if (!r || r.speedId !== id || room.status !== 'playing' || r.phase !== 'racing') return;
+    gc.speedTimeout(room);
+    broadcastRoom(room);
+  }, Math.max(0, round.deadlineAt - now));
+}
 
 function playerBySocket(room, socketId) {
   return [...room.players, ...room.spectators, ...(room.away || [])].find((p) => p.socketId === socketId) || null;

@@ -31,6 +31,9 @@ let roundEndTimer = null;
 let pokerRerollTimer = null;
 let wasLowest = false;        // 話胚:上次 render 時我是否為最小者(用來在「剛輪到我」時播提示音)
 let wasNeedRoll = false;      // 上次 render 時我是否需要搖骰(用來在「剛輪到我搖骰」時播提示音)
+let prevSpeedPhase = null;    // 手速骰:上次 render 的 phase(用來偵測 countdown→racing 揭題播音)
+let speedClockTimer = null;   // 手速骰:本地倒數/計時 interval
+let speedSkew = 0;            // 手速骰:client 與 server 的時鐘偏移(Date.now() - serverNow)
 let lastLoserKey = '';        // 上次顯示的輸家(用來在「剛決出輸家」時播一次嘲諷音效)
 let loserDismissedKey = '';   // 已被使用者點掉的輸家 popup(同一場不再顯示)
 let lastStatsKey = '';        // 吹牛開盅各點數統計 popup 的內容簽章
@@ -222,6 +225,15 @@ function render() {
   renderBluffStats();
   updateBarMetric(); // 量測底部動作條高度 → 浮動鈕/棋盤留白貼齊(手機直向)
   maybeAutoNext();
+
+  // 手速骰:本地倒數/計時 + 揭題提示音(countdown→racing)
+  setupSpeedClock();
+  if (state.game && state.game.mode === 'speed') {
+    if (state.game.phase === 'racing' && prevSpeedPhase === 'countdown') playAlert();
+    prevSpeedPhase = state.game.phase;
+  } else {
+    prevSpeedPhase = null;
+  }
 
   // 輪到我搖骰(各模式 rolling 階段、含紅黑單雙「搖下一骰」)→ 提示音(同話胚)
   const needRoll = iNeedToRoll();
@@ -605,6 +617,11 @@ function renderLobby() {
       <input id="blackjackLives" type="number" min="0" max="10" value="${state.blackjackLives}" /></div>`;
     html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
   }
+  if (state.modeId === 'speed') {
+    html += `<div class="lobby-row"><span class="label">每局秒數</span>
+      <input id="speedSeconds" type="number" min="10" max="60" value="${state.speedSeconds}" /></div>`;
+    html += `<div class="lobby-row hint">倒數 3 秒揭題,搶先湊出指定牌型;最後一個沒湊到的人輸</div>`;
+  }
   if (state.modeId === 'mixed') {
     html += `<div class="lobby-row"><label class="auto-next">
       <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label>
@@ -622,6 +639,7 @@ function renderLobby() {
   const dc = $('diceCount');
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
   $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
+  $('speedSeconds')?.addEventListener('change', (e) => act('setSpeedSeconds', { value: e.target.value }));
   $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
   $('roulettePasses')?.addEventListener('change', (e) => act('setRoulettePasses', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
@@ -661,13 +679,45 @@ function maybeAutoNext() {
 }
 
 function startButtonLabel() {
-  if (state.modeId === 'liars' || state.modeId === 'mixed' || state.modeId === 'roulette') {
+  if (state.modeId === 'liars' || state.modeId === 'mixed' || state.modeId === 'roulette' || state.modeId === 'speed') {
     if (state.matchOver) return '再來一場';
-    if (state.game) return '下一輪';
+    if (state.game) return state.modeId === 'speed' ? '下一局' : '下一輪';
     return '開始遊戲';
   }
   if (state.modeId === 'roll') return state.game ? '再搖一輪' : '開始搖骰';
   return '開始';
+}
+
+// 手速骰:依 server 的 targetAt/deadlineAt + 時鐘偏移,本地高頻更新倒數/計時 DOM
+// (只改文字節點,不整頁 render,避免骰子被重建打斷動畫)
+function setupSpeedClock() {
+  const g = state && state.game;
+  const active = g && g.mode === 'speed' && state.status === 'playing'
+    && (g.phase === 'countdown' || g.phase === 'racing');
+  if (speedClockTimer) { clearInterval(speedClockTimer); speedClockTimer = null; }
+  if (!active) return;
+  speedSkew = Date.now() - (g.serverNow || Date.now());
+  const tick = () => {
+    const gg = state && state.game;
+    if (!gg || gg.mode !== 'speed' || state.status !== 'playing') {
+      clearInterval(speedClockTimer); speedClockTimer = null; return;
+    }
+    const serverNow = Date.now() - speedSkew;
+    if (gg.phase === 'countdown') {
+      const n = Math.ceil((gg.targetAt - serverNow) / 1000);
+      const cd = document.getElementById('speedCount');
+      if (cd) cd.textContent = n > 0 ? String(n) : 'GO!';
+    } else if (gg.phase === 'racing') {
+      const sec = Math.max(0, Math.ceil((gg.deadlineAt - serverNow) / 1000));
+      const ck = document.getElementById('speedClock');
+      if (ck) {
+        ck.textContent = `⏱️ ${sec}s`;
+        ck.classList.toggle('danger', sec <= 5);
+      }
+    }
+  };
+  speedClockTimer = setInterval(tick, 100);
+  tick();
 }
 
 function renderBanner() {
@@ -773,6 +823,25 @@ function renderBanner() {
     el.style.display = '';
     return;
   }
+  if (g && g.mode === 'speed') {
+    if (g.phase === 'countdown') {
+      return show('<span class="speed-count" id="speedCount">準備…</span>');
+    }
+    if (g.phase === 'racing') {
+      const done = (g.done || []).includes(myId);
+      return show(`🎯 湊出 <strong>${esc(g.targetLabel || '')}</strong> 以上 `
+        + `・ <span class="speed-clock" id="speedClock">⏱️ --</span>`
+        + (done ? ' ・ <span class="hl">✅ 你已安全</span>' : ''));
+    }
+    if (g.reveal) {
+      const nmL = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
+      const losers = (g.reveal.losers || []).map(nmL).join('、');
+      return show(losers ? `⏱️ 結束! ・ 💀 ${losers} 輸了!` : '⏱️ 結束!無人落敗');
+    }
+    el.style.display = 'none'; el.innerHTML = '';
+    return;
+  }
+
   if (g && g.mode === 'liars') {
     if (state.status === 'playing' && g.phase === 'rolling') {
       const done = (g.rolled || []).length;
@@ -1017,6 +1086,43 @@ function renderBoard() {
           info.textContent = '';
         }
       }
+    } else if (g.mode === 'speed') {
+      const done = g.done || [];
+      const isDone = done.includes(p.id);
+      const rank = isDone ? done.indexOf(p.id) + 1 : 0;
+      const ended = g.phase === 'roundEnd';
+      const isLoser = ended && g.reveal && (g.reveal.losers || []).includes(p.id);
+      cell.classList.toggle('done-safe', isDone && !ended);
+      cell.classList.toggle('eliminated', isLoser);
+
+      if (g.phase === 'countdown') {
+        stage.innerHTML = '<div class="waiting">準備…</div>';
+        diceCache.delete('cell-' + p.id);
+        info.textContent = '';
+      } else if (p.id === myId && !ended) {
+        // 自己:活骰,可點選鎖定;重骰由 controls 的按鈕送出(靜態更新求手速)
+        const dice = g.myDice || [];
+        if (dice.length) {
+          showDice(stage, 'cell-' + p.id, dice, false, true);
+          applyLockUI(stage, g.myLocked || [], g.phase === 'racing' && !isDone);
+        }
+        info.innerHTML = isDone
+          ? `<span class="speed-badge ok">✅ 安全 #${rank}</span>`
+          : '<span class="speed-badge go">⏳ 搶骰中</span>';
+      } else {
+        // 他人(racing 時只看狀態徽章);結束後全員攤開骰子
+        const dice = (g.dice && g.dice[p.id]) || [];
+        if (ended && dice.length) {
+          showDice(stage, 'cell-' + p.id, dice, false, true);
+        } else {
+          stage.innerHTML = '';
+          diceCache.delete('cell-' + p.id);
+        }
+        info.innerHTML = isDone
+          ? `<span class="speed-badge ok">✅ 已達標 #${rank}</span>`
+          : (isLoser ? '<span class="speed-badge lose">💀 沒達標</span>'
+            : '<span class="speed-badge go">⏳ 搶骰中</span>');
+      }
     } else if (g.mode === 'mixed') {
       const reveal = g.reveal;
       if (reveal && reveal.hands[p.id]) {
@@ -1142,6 +1248,26 @@ function renderControls() {
       }
     } else {
       el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
+    }
+    return;
+  }
+
+  if (g.mode === 'speed' && state.status === 'playing') {
+    if (g.phase === 'countdown') {
+      el.innerHTML = '<p class="muted">⏳ 倒數中…準備搶骰!</p>';
+      return;
+    }
+    if (g.phase === 'racing') {
+      if ((g.done || []).includes(myId)) {
+        el.innerHTML = '<p class="muted">✅ 你已達標安全!等待其他人…</p>';
+      } else {
+        el.innerHTML = '<div class="bid-row">'
+          + '<button id="speedReroll">🎲 重骰(未鎖的)</button>'
+          + '</div><p class="hint muted">點骰子可鎖定不重骰</p>';
+        $('speedReroll')?.addEventListener('click', () => act('action', { type: 'reroll' }));
+      }
+    } else {
+      el.innerHTML = '<p class="muted">本局結束,等待房主開下一局…</p>';
     }
     return;
   }

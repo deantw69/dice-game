@@ -68,7 +68,7 @@ codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('join').
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') codeInput.focus(); });
 
 // ---- 現有房間列表 ----
-const MODE_NAMES = { roll: '純搖骰', liarsDice: '吹牛骰', poker: '話胚', redBlack: '紅黑單雙', mixed: '三合一' };
+const MODE_NAMES = { roll: '純搖骰', liarsDice: '吹牛骰', poker: '話胚', redBlack: '紅黑單雙', mixed: '三合一', speed: '手速骰' };
 
 function renderRoomList(rooms) {
   if (!rooms || rooms.length === 0) {

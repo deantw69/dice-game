@@ -33,7 +33,7 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 - `server/index.js` — Socket.IO 事件接線層。每個 client→server 事件做基本驗證後委派給 `gameController`/`roomManager`,再呼叫 `broadcastRoom()`。所有事件都用 ack callback 回 `{ ok }` 或 `{ error }`。另提供 `GET /version` 回傳部署的 git commit 短碼(首頁顯示;本機為 `dev`)。
 - `server/gameController.js` — **模式無關**的回合/整場生命週期:`setMode` / `startRound` / `handleAction` / `forceReset` / `onPlayerLeft`,以及「由輸家決定玩法」的順位計算(`computeDecider`)與輸家累計(`recordLosses`)。
 - `server/games/*.js` — 各遊戲模式,實作共同介面;在 `games/index.js` 的 `MODES` + `MODE_LIST` 註冊(`MODE_LIST` 的 `available:false` 會在 UI 隱藏並由 `setMode` 拒絕)。
-- `server/roomManager.js` — 房間/玩家成員、4 碼房號(可自訂)、重連、`viewFor()`(見下)。成員分**三區**:`players`(正式參與)、`spectators`(下一局加入)、`away`(暫離區);房間在三區皆空時才刪除。`createRoom` 可帶 `customCode`(4 碼英數,未被占用就用,否則回錯)。`getRoomList()` 回傳所有房間的公開摘要(房號、房主、人數、狀態、模式),供首頁房間列表使用。
+- `server/roomManager.js` — 房間/玩家成員、4 碼房號(可自訂)、重連、`viewFor()`(見下)。成員分**三區**:`players`(正式參與)、`spectators`(下一局加入)、`away`(暫離區);房間在三區皆空時才刪除。`createRoom` 可帶 `customCode`(4 碼英數,未被占用就用,否則回錯)。`joinRoom` 暱稱在房內三區重複時不報錯,改用 `uniqueNameInRoom()` 自動加序號(`王`→`王2`→`王3`)。`getRoomList()` 回傳所有房間的公開摘要(房號、房主、人數、狀態、模式),供首頁房間列表使用。
 
 ### 遊戲模式介面(新增模式照這個寫)
 有兩種:
@@ -53,7 +53,7 @@ node some_test.mjs                          # 連 http://localhost:3000,用 emit
 
 ### 前端(`public/`)
 - `room.js` 是大宗:訂閱 `roomState`,每次收到就整頁 `render()`(roster / banner / board / controls 等)。狀態完全來自伺服器,前端不保留遊戲狀態。
-- `net.js`:Socket.IO 封裝(`emit` 回 Promise)+ session 存取。`app.js`:首頁取暱稱、建房/加房,以及「現有房間」列表(透過 `listRooms` 事件首次查詢 + `roomListUpdate` 即時更新;點擊房間項目直接加入)。首頁也會讀網址 `?code=XXXX` 自動填好房號並聚焦暱稱欄(供掃 QR 進來者直接輸入名稱加入)。
+- `net.js`:Socket.IO 封裝(`emit` 回 Promise)+ session 存取。`app.js`:首頁取暱稱(空白時 `ensureName()` 隨機產生「形容詞+動物+數字」並回填)、建房/加房,以及「現有房間」列表(透過 `listRooms` 事件首次查詢 + `roomListUpdate` 即時更新;點擊房間項目直接加入)。首頁也會讀網址 `?code=XXXX` 自動填好房號並聚焦暱稱欄(供掃 QR 進來者直接輸入名稱加入)。
 - **分享房間 QR**:房間頁選單「📷 分享」鈕把 `${origin}/?code=房號` 畫成 QR overlay 供他人手機掃描。QR 產生器在 `public/js/vendor/qrcode.js`(自製、byte 模式、自動選版本/錯誤更正等級,純前端無外部依賴/不打 API),`room.js` 的 `drawQr()` 把布林矩陣畫到 canvas。
 - 骰子渲染器在 `public/js/dice/`,共同介面 `{ setCount, rollTo, setStatic }`(`diceCss3d` 為遊戲主要使用)。`diceCup`(骰盅:蓋住搖→掀蓋)除 `demo.html` 比較外,**吹牛骰「抓」之前的自己骰子視圖**也用它(`room.js` 的 `getCup`),額外提供分段控制 `{ cover, shake, reveal }`:蓋著待命 / 按住搖骰抖動 / 放開拿到 `myDice` 掀蓋亮點(開盅後再點骰子區可反覆蓋回/打開);盅內骰子尺寸由 `--ds` 依數量自動縮放(CSS 規則用 `.cup-scene .cup-tray` 前綴提高特異度,蓋過 `.dice-stage` 的固定尺寸),確保不超出盅。另有 `scatter` 選項(`getCup` 已啟用):盅內骰子改絕對定位、位置/角度/間距隨機,以 SAT(分離軸定理)碰撞檢測保證彼此不重疊(放不下就自動縮小重排);掀蓋時播「撞來撞去」動畫——隨機初速+自轉,撞牆/互撞(每幀用 MTV 把穿插的方塊推開)、阻尼減速,自然停下即為不重疊散落樣貌直接定格;同一手沿用同組位置,僅換新一手或數量變動才重抽,rAF 被分頁節流時以計時器保底定格。`diceThree` 仍僅用於 `demo.html`。音效在 `cupSound.js`,全部受 `window.__cupMuted` 控制(遊戲內 🔊 鈕切換)。
 - UI 慣例:玩家名稱高亮用 `.hl` class;手機在 `@media (max-width: 600px)` 精簡 header;上半部 `.room-sticky` 釘頂;玩家列表是右下角懸浮面板。

@@ -63,10 +63,10 @@ export function createRoom(name, socketId, customCode) {
 export function joinRoom(code, name, socketId) {
   const room = rooms.get(code);
   if (!room) return { error: '找不到此房間' };
-  // 重名檢查涵蓋三區(含暫離 away),避免暫離者暱稱被重用造成兩個同名玩家
-  if (allMembers(room).some((p) => p.name === name)) return { error: '此房間已有人用這個暱稱' };
+  // 重名時自動加序號(涵蓋三區含暫離 away),避免兩個同名玩家
+  const uniqueName = uniqueNameInRoom(room, name);
 
-  const player = makePlayer(name, socketId);
+  const player = makePlayer(uniqueName, socketId);
   if (room.status === 'playing') {
     room.spectators.push(player);
     return { room, player, asSpectator: true };
@@ -93,6 +93,15 @@ export function rejoin(code, playerId, socketId) {
 // 房間全部成員(含暫離區)
 function allMembers(room) {
   return [...room.players, ...room.spectators, ...(room.away || [])];
+}
+
+// 暱稱在房內已存在就自動加序號(王 → 王2 → 王3 …),確保唯一
+function uniqueNameInRoom(room, name) {
+  const taken = new Set(allMembers(room).map((p) => p.name));
+  if (!taken.has(name)) return name;
+  let i = 2;
+  while (taken.has(`${name}${i}`)) i++;
+  return `${name}${i}`;
 }
 
 export function findPlayer(room, playerId) {

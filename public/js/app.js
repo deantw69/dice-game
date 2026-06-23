@@ -35,6 +35,26 @@ function showError(msg) {
   errEl.textContent = msg || '';
 }
 
+// 未輸入暱稱時隨機產生一個(形容詞 + 動物 + 兩碼數字)
+const RAND_ADJ = ['快樂', '神祕', '幸運', '無敵', '暴走', '冷酷', '呆萌', '閃電', '黃金', '隱形', '狂歡', '熱血'];
+const RAND_NOUN = ['骰神', '柴犬', '貓咪', '企鵝', '海獺', '老虎', '兔子', '熊貓', '狐狸', '鯊魚', '河馬', '猴子'];
+function randomName() {
+  const a = RAND_ADJ[Math.floor(Math.random() * RAND_ADJ.length)];
+  const n = RAND_NOUN[Math.floor(Math.random() * RAND_NOUN.length)];
+  return `${a}${n}${Math.floor(10 + Math.random() * 90)}`;
+}
+
+// 取暱稱:沒輸入就隨機產生並回填輸入框
+function ensureName() {
+  let name = nameInput.value.trim();
+  if (!name) {
+    name = randomName();
+    nameInput.value = name;
+    localStorage.setItem(NAME_KEY, name);
+  }
+  return name;
+}
+
 function go(code, playerId, name) {
   localStorage.setItem(NAME_KEY, name);
   localStorage.setItem(CODE_KEY, code);
@@ -44,8 +64,7 @@ function go(code, playerId, name) {
 
 $('create').addEventListener('click', async () => {
   showError('');
-  const name = nameInput.value.trim();
-  if (!name) return showError('請先輸入暱稱');
+  const name = ensureName();
   const code = customCodeInput.value.trim().toUpperCase();
   const res = await emit('createRoom', { name, code: code || undefined });
   if (res.error) return showError(res.error);
@@ -54,9 +73,8 @@ $('create').addEventListener('click', async () => {
 
 $('join').addEventListener('click', async () => {
   showError('');
-  const name = nameInput.value.trim();
+  const name = ensureName();
   const code = codeInput.value.trim().toUpperCase();
-  if (!name) return showError('請先輸入暱稱');
   if (!code) return showError('請輸入房號');
   const res = await emit('joinRoom', { code, name });
   if (res.error) return showError(res.error);
@@ -97,8 +115,6 @@ function renderRoomList(rooms) {
       const code = el.dataset.code;
       codeInput.value = code;
       localStorage.setItem(CODE_KEY, code);
-      const name = nameInput.value.trim();
-      if (!name) { showError('請先輸入暱稱'); nameInput.focus(); return; }
       $('join').click();
     });
   });

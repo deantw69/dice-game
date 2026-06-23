@@ -186,6 +186,8 @@ function render() {
 
   // 房主才看得到「強制重來」與「自動下一場」(頂部常駐,隨時可勾)
   $('forceReset').style.display = state.you.isHost ? '' : 'none';
+  // 「打亂玩家順序」:房主、在大廳、且多於 1 人才顯示(開局後順序鎖定)
+  $('shuffle').style.display = (state.you.isHost && state.status === 'lobby' && state.players.length > 1) ? '' : 'none';
   // 吹牛骰整個模式都是吹牛 → 不提供自動下一場;混合模式仍顯示(僅吹牛子玩法那局不自動)
   $('autoNextWrap').style.display = (state.you.isHost && state.modeId !== 'liars') ? '' : 'none';
   // 「我要暫離」:正式玩家才看得到(觀戰中/已暫離不顯示)
@@ -585,8 +587,6 @@ function renderLobby() {
       <input type="checkbox" id="autoRotate" ${state.autoRotate ? 'checked' : ''}/> 自動順位(紅黑單雙)</label></div>`;
   }
 
-  html += `<div class="lobby-row"><button id="shuffle" class="secondary">🔀 打亂玩家順序</button></div>`;
-
   const startLabel = startButtonLabel();
   html += `<div class="lobby-row"><button id="start" ${state.modeId ? '' : 'disabled'}>${startLabel}</button></div>`;
   el.innerHTML = html;
@@ -602,7 +602,6 @@ function renderLobby() {
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
-  $('shuffle')?.addEventListener('click', () => act('shufflePlayers', {}));
 }
 
 // 吹牛玩法不自動下一場(一定要房主手動按):吹牛骰模式、或混合模式上一局是吹牛子玩法
@@ -1393,6 +1392,11 @@ function closeQr() { $('qrOverlay').style.display = 'none'; }
 $('shareQr').addEventListener('click', () => {
   document.querySelector('.room-top')?.classList.remove('menu-open'); // 收起手機選單
   openQr();
+});
+// 打亂玩家順序(僅房主、大廳、多於 1 人;按鈕常駐選單,顯示由 render 控制)
+$('shuffle').addEventListener('click', () => {
+  document.querySelector('.room-top')?.classList.remove('menu-open'); // 收起手機選單
+  act('shufflePlayers', {});
 });
 $('qrClose').addEventListener('click', closeQr);
 $('qrOverlay').addEventListener('click', (e) => { if (e.target === $('qrOverlay')) closeQr(); });

@@ -251,10 +251,9 @@ export const mixedMode = {
     return counts.filter((c) => c > 0).length <= 1;
   },
 
-  // 僅剩一位有骰子 → 該位獲勝;否則無單一贏家(由 reveal.losers 呈現輸家)
-  winner(match, players) {
-    const alive = players.filter((p) => (match.diceLeft[p.id] || 0) > 0);
-    return alive.length === 1 ? alive[0] : null;
+  // 三合一三種子玩法都是「決定出輸家就結束」,沒有最終勝利者概念 → 一律不回傳贏家
+  winner() {
+    return null;
   },
 
   publicView(round, match, players) {

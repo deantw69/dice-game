@@ -153,6 +153,13 @@ export function speedReveal(room) {
   MODES.speed.reveal(room.round, Date.now());
   if (room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
 }
+export function speedConfirmAchieve(room, playerId, rollSeq, speedId) {
+  if (room.modeId !== 'speed' || !room.round) return false;
+  if (room.round.speedId !== speedId) return false;
+  const changed = MODES.speed.confirmAchieve(room.round, playerId, rollSeq);
+  if (changed && room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
+  return changed;
+}
 export function speedTimeout(room) {
   if (room.modeId !== 'speed' || !room.round) return;
   MODES.speed.resolveTimeout(room.round);

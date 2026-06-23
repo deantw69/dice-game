@@ -206,8 +206,15 @@ io.on('connection', (socket) => {
     if (!me) return cb?.({ error: '找不到你的座位' });
     const res = gc.handleAction(room, me, action || {});
     if (res.error) return cb?.({ error: res.error });
-    cb?.({ ok: true });
+    cb?.({ ok: true, cooldown: res.cooldown, retryMs: res.retryMs });
     broadcastRoom(room);
+    // 手速骰:達標判定延遲到骰子動畫跑完,所有玩家同步看到結果
+    if (res.pendingAchieve) {
+      const { pendingAchieve: pid, rollSeq, speedId } = res;
+      setTimeout(() => {
+        if (gc.speedConfirmAchieve(room, pid, rollSeq, speedId)) broadcastRoom(room);
+      }, 1500);
+    }
   });
 
   socket.on('leaveRoom', (_p, cb) => {

@@ -10,6 +10,7 @@ import { evalHand } from '../util/pokerHand.js';
 
 const REVEAL_DELAY_MS = 3000;        // 倒數 3-2-1
 const ROLL_COOLDOWN_MS = 1000;       // 連續擲骰最小間隔(限制快速連按;伺服器權威)
+const ACHIEVE_DELAY_MS = 1500;       // 達標判定延遲(等前端骰子動畫跑完再廣播)
 const DEFAULT_SECONDS = 30;
 const MIN_SECONDS = 10;
 const MAX_SECONDS = 60;
@@ -85,14 +86,14 @@ export const speedMode = {
       const fresh = rollDice(5);
       round.dice[player.id] = cur.map((v, i) => (locked.includes(i) ? v : (fresh[i] ?? v)));
       round.rolls[player.id] = (round.rolls[player.id] || 0) + 1;
-      let achieved = false;
+      const rollSeq = round.rolls[player.id];
       // 「剛好」指定牌型才算達標(非該牌型以上)
+      // 不立刻 markDone — 回傳 pendingAchieve 讓 index.js 延遲 1.5s 再廣播,
+      // 所有玩家都等骰子動畫跑完才看到達標結果
       if (evalHand(round.dice[player.id]).arr[0] === round.targetRank) {
-        markDone(round, player.id, Date.now());
-        achieved = true;
+        return { ok: true, pendingAchieve: player.id, rollSeq, speedId: round.speedId };
       }
-      this.checkEarlyEnd(round);
-      return { ok: true, achieved };
+      return { ok: true };
     }
 
     return { error: '無效動作' };
@@ -167,6 +168,18 @@ export const speedMode = {
       myLocked: (round.locked && round.locked[player.id]) || [],
     };
   },
+  // 延遲達標確認:由 index.js 在 ACHIEVE_DELAY_MS 後呼叫
+  confirmAchieve(round, playerId, rollSeq) {
+    // 只在 racing 階段確認;若 timeout 已先觸發(roundEnd)就不再補達標
+    if (round.phase !== 'racing') return false;
+    if (round.done.includes(playerId)) return false;
+    if ((round.rolls[playerId] || 0) !== rollSeq) return false;
+    markDone(round, playerId, Date.now());
+    this.checkEarlyEnd(round);
+    return true;
+  },
+
+  achieveDelayMs: ACHIEVE_DELAY_MS,
 };
 
 function markDone(round, id, now) {

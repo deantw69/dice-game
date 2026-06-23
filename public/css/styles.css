@@ -466,6 +466,17 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: var(--lose); line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
 .loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: var(--lose-text); }
 .loser-popup .loser-hint { margin-top: 10px; font-size: var(--fs-xs); }
+/* 炸彈爆炸特效(俄羅斯輪盤爆掉時) — 在輸家 popup 之上、滿版置中,純視覺不擋點擊 */
+.bomb-fx { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
+.bomb-fx .bomb-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,240,200,0.95), rgba(255,140,40,0.4) 35%, transparent 70%); animation: bombFlash .55s ease-out forwards; }
+@keyframes bombFlash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+.bomb-fx .bomb-ring { position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 6px solid rgba(255,180,60,0.9); box-shadow: 0 0 40px rgba(255,140,40,0.8); animation: bombRing .7s cubic-bezier(.15,.7,.4,1) forwards; }
+@keyframes bombRing { 0% { transform: scale(.2); opacity: 1; border-width: 14px; } 100% { transform: scale(14); opacity: 0; border-width: 1px; } }
+.bomb-fx .bomb-core { position: absolute; font-size: 8rem; line-height: 1; filter: drop-shadow(0 0 30px rgba(255,120,30,0.9)); animation: bombCore .8s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes bombCore { 0% { transform: scale(.1) rotate(-12deg); opacity: 0; } 18% { transform: scale(1.35) rotate(6deg); opacity: 1; } 60% { transform: scale(1.1) rotate(0); opacity: 1; } 100% { transform: scale(1.25); opacity: 0; } }
+.bomb-fx .bomb-shard { position: absolute; font-size: 2.2rem; animation: bombShard .9s ease-out forwards; }
+@keyframes bombShard { 0% { transform: translate(0,0) scale(.4) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--rot)); opacity: 0; } }
+@media (max-width: 600px) { .bomb-fx .bomb-core { font-size: 5.5rem; } .bomb-fx .bomb-shard { font-size: 1.6rem; } }
 /* 最終勝利者 popup */
 .winner-popup { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .winner-popup .winner-card {

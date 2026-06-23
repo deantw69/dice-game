@@ -113,6 +113,49 @@ export function playVictory() {
   note(t0 + 1.18, 2093.00, 0.30, 0.2); // C7 高八度作結
 }
 
+// 炸彈爆炸:低頻轟隆爆裂 + 次低音衝擊 + 碎裂尾音(俄羅斯輪盤爆掉時播)
+export function playExplosion() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return; // 靜音
+  const ac = ctx();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+
+  // 1) 寬頻雜訊爆裂(低通掃頻,模擬轟隆衝擊波)
+  const dur = 0.9;
+  const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    const decay = Math.pow(1 - i / data.length, 2); // 指數衰減
+    data[i] = (Math.random() * 2 - 1) * decay;
+  }
+  const noise = ac.createBufferSource();
+  noise.buffer = buf;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(1800, t0);
+  lp.frequency.exponentialRampToValueAtTime(120, t0 + dur);
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(0.9, t0 + 0.01);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  noise.connect(lp).connect(ng).connect(ac.destination);
+  noise.start(t0);
+  noise.stop(t0 + dur);
+
+  // 2) 次低音衝擊(下滑正弦,胸腔感)
+  const sub = ac.createOscillator();
+  const sg = ac.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(160, t0);
+  sub.frequency.exponentialRampToValueAtTime(35, t0 + 0.5);
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(0.9, t0 + 0.015);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+  sub.connect(sg).connect(ac.destination);
+  sub.start(t0);
+  sub.stop(t0 + 0.6);
+}
+
 // 在 durationMs 內連續播放喀啦聲(模擬骰子在盅內碰撞)
 let lastPlay = -1;
 export function playRattle(durationMs = 950) {

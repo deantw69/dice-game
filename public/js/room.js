@@ -2,7 +2,7 @@
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
 import { createRenderer as createCup } from './dice/diceCup.js';
-import { playAlert, playFanfare, playRattle, playVictory } from './dice/cupSound.js';
+import { playAlert, playFanfare, playRattle, playVictory, playExplosion } from './dice/cupSound.js';
 import { makeQrMatrix } from './vendor/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
@@ -314,7 +314,32 @@ function renderLoserBanner() {
     + `<div class="loser-name">${names}</div>${reason}`
     + `</div>`;
   el.style.display = 'flex';
-  playFanfare();
+  // 俄羅斯輪盤爆掉 → 播炸彈爆炸特效 + 爆炸音效;其餘模式維持嘲諷小號
+  if (state.game && state.game.mode === 'roulette') {
+    playBombFx();
+    playExplosion();
+  } else {
+    playFanfare();
+  }
+}
+
+// 炸彈爆炸動圖特效:滿版閃光 + 擴散衝擊環 + 💥 核心 + 四散碎片,播一次後自動隱藏
+function playBombFx() {
+  const el = $('bombFx');
+  if (!el) return;
+  const shards = ['💥', '🔥', '💢', '✨', '💀', '🔥', '💥', '✨'];
+  const parts = shards.map((emo, i) => {
+    const ang = (Math.PI * 2 * i) / shards.length + (i % 2 ? 0.3 : -0.3);
+    const dist = 160 + (i % 3) * 70;
+    const dx = Math.round(Math.cos(ang) * dist);
+    const dy = Math.round(Math.sin(ang) * dist);
+    const rot = (i % 2 ? 1 : -1) * (180 + i * 40);
+    return `<div class="bomb-shard" style="--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg">${emo}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="bomb-flash"></div><div class="bomb-ring"></div>`
+    + `<div class="bomb-core">💥</div>${parts}`;
+  el.style.display = 'flex';
+  setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1000);
 }
 
 // 淘汰制最終勝利者 popup:matchOver + winnerId 時延遲彈出(讓輸家 popup 先顯示)

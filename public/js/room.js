@@ -2,7 +2,7 @@
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
 import { createRenderer as createCup } from './dice/diceCup.js';
-import { playAlert, playFanfare, playRattle } from './dice/cupSound.js';
+import { playAlert, playFanfare, playRattle, playVictory } from './dice/cupSound.js';
 import { makeQrMatrix } from './vendor/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
@@ -344,7 +344,7 @@ function renderWinnerBanner() {
       + `<div class="winner-name">${esc(w ? w.name : '?')}</div>`
       + `</div>`;
     el.style.display = 'flex';
-    playFanfare();
+    playVictory();
   }, 1800);
 }
 

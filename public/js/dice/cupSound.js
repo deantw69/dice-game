@@ -79,6 +79,40 @@ export function playFanfare() {
   note(t0 + 0.44, 1046.50, 0.40); // C6(拉長)
 }
 
+// 最終勝利者:華麗凱旋號角(雙音和聲 + 末段顫音收尾)
+export function playVictory() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return; // 靜音
+  const ac = ctx();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  const note = (when, freq, dur, vol = 0.2, type = 'square') => {
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g).connect(ac.destination);
+    o.start(when);
+    o.stop(when + dur + 0.02);
+  };
+  // 上行琶音 G-C-E-G,主旋律 + 低五度和聲
+  const mel = [
+    [0.00, 783.99, 0.16], // G5
+    [0.16, 1046.50, 0.16], // C6
+    [0.32, 1318.51, 0.16], // E6
+    [0.48, 1567.98, 0.55], // G6(拉長,凱旋)
+  ];
+  mel.forEach(([w, f, d]) => {
+    note(t0 + w, f, d);
+    note(t0 + w, f / 1.5, d, 0.12, 'triangle'); // 低五度和聲鋪底
+  });
+  // 末段顫音收尾
+  note(t0 + 1.05, 1567.98, 0.10, 0.18);
+  note(t0 + 1.18, 2093.00, 0.30, 0.2); // C7 高八度作結
+}
+
 // 在 durationMs 內連續播放喀啦聲(模擬骰子在盅內碰撞)
 let lastPlay = -1;
 export function playRattle(durationMs = 950) {

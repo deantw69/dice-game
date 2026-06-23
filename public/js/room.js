@@ -228,7 +228,7 @@ function render() {
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
   renderPokerGuide();
   renderModeInfo();
-  if (!pokerRerollAnim) renderLoserBanner(); // 重骰動畫期間先別跳輸家公告(等動畫停再顯示)
+  if (!pokerRerollAnim && !speedRolling) renderLoserBanner(); // 重骰/手速骰動畫期間先別跳輸家公告(等動畫停再顯示)
   renderWinnerBanner();
   renderBluffStats();
   updateBarMetric(); // 量測底部動作條高度 → 浮動鈕/棋盤留白貼齊(手機直向)
@@ -1155,7 +1155,7 @@ function renderBoard() {
       const rank = isDone ? done.indexOf(p.id) + 1 : 0;
       const ended = g.phase === 'roundEnd';
       const isLoser = ended && g.reveal && (g.reveal.losers || []).includes(p.id);
-      cell.classList.toggle('done-safe', isDone && !ended);
+      cell.classList.toggle('done-safe', isDone && !ended && !(p.id === myId && speedRolling));
       cell.classList.toggle('eliminated', isLoser);
 
       if (g.phase === 'countdown') {
@@ -1163,31 +1163,36 @@ function renderBoard() {
         diceCache.delete('cell-' + p.id);
         info.textContent = '';
         if (p.id === myId) { speedLastMyRolls = 0; speedRollReadyAt = 0; speedRolling = false; clearTimeout(speedRollingTimer); } // 新一局:重置
-      } else if (p.id === myId && !ended) {
-        // 自己:活骰,可點選鎖定;重骰由 controls 的按鈕送出
+      } else if (p.id === myId) {
+        // 自己:活骰 / 結束攤開;偵測「剛搖完」播動畫 + 延遲達標顯示
         const dice = g.myDice || [];
         if (dice.length) {
           const myRolls = (g.rolls && g.rolls[myId]) || 0;
           if (myRolls !== speedLastMyRolls) {
-            // 我剛搖完一次:讓「未鎖定」的骰子滾動(即使點數沒變也轉)
             const lockedSet = new Set(g.myLocked || []);
             const rollIdx = dice.map((_, i) => i).filter((i) => !lockedSet.has(i));
             showDice(stage, 'cell-' + p.id, dice, false, false, rollIdx);
             speedLastMyRolls = myRolls;
-            // 動畫進行中:延遲達標顯示
             speedRolling = true;
             clearTimeout(speedRollingTimer);
             speedRollingTimer = setTimeout(() => { speedRolling = false; render(); }, 1500);
           } else {
-            showDice(stage, 'cell-' + p.id, dice, false, true); // 非本人觸發的 render:靜態保留
+            showDice(stage, 'cell-' + p.id, dice, false, true);
           }
           applyLockUI(stage, g.myLocked || [], g.phase === 'racing' && !isDone);
         }
         const showDone = isDone && !speedRolling;
         cell.classList.toggle('done-safe', showDone && !ended);
-        info.innerHTML = showDone
-          ? `<span class="speed-badge ok">✅ 安全 #${rank}</span>`
-          : '<span class="speed-badge go">⏳ 搶骰中</span>';
+        if (ended && !speedRolling) {
+          info.innerHTML = isDone
+            ? `<span class="speed-badge ok">✅ 已達標 #${rank}</span>`
+            : (isLoser ? '<span class="speed-badge lose">💀 沒達標</span>'
+              : '<span class="speed-badge go">⏳ 搶骰中</span>');
+        } else {
+          info.innerHTML = showDone
+            ? `<span class="speed-badge ok">✅ 安全 #${rank}</span>`
+            : '<span class="speed-badge go">⏳ 搶骰中</span>';
+        }
       } else {
         // 他人(racing 時只看狀態徽章);結束後全員攤開骰子
         const dice = (g.dice && g.dice[p.id]) || [];
@@ -1336,7 +1341,7 @@ function renderControls() {
       el.innerHTML = '<p class="muted">⏳ 倒數中…準備搶骰!</p>';
       return;
     }
-    if (g.phase === 'racing') {
+    if (g.phase === 'racing' || speedRolling) {
       if ((g.done || []).includes(myId) && !speedRolling) {
         el.innerHTML = '<p class="muted">✅ 你已達標安全!等待其他人…</p>';
       } else if (!(g.done || []).includes(myId) || speedRolling) {

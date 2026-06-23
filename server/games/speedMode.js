@@ -1,6 +1,6 @@
 // 手速骰(speed)— 即時同步競速模式(專案第一個用伺服器計時器的模式)
 // 流程:countdown(倒數 3-2-1) → racing(揭題,全員同時各搖各的骰、無限重骰、可鎖骰)
-//       搶先湊出「指定撲克牌型(含)以上」即達標安全。
+//       揭題後不自動發骰,玩家自己按「搖骰」開始;搶先湊出「剛好指定撲克牌型」即達標安全。
 // 輸家判定:當只剩 1 人未達標(N-1 人達標)→ 立刻結束、該人輸;
 //           時間到仍有 ≥2 人未達標 → 未達標者全部輸。
 // 單局制:無生命、無淘汰、無最終勝利者(每局選出輸家即回大廳,類比吹牛骰)。
@@ -44,7 +44,7 @@ export const speedMode = {
       done: [],                       // 已達標的 playerId(順序即達標名次)
       doneAt: {},                     // playerId -> 達標時間
       reveal: null,                   // roundEnd 後:{ losers }
-      rollSeq: 0,
+      rolls: {},                      // playerId -> 已搖次數(前端據此觸發骰子動畫)
       speedId: ++speedSeq,            // 過期計時器自我失效用
       startAt: now,
       targetAt: now + REVEAL_DELAY_MS,
@@ -52,15 +52,10 @@ export const speedMode = {
     };
   },
 
-  // T1:揭題,發 5 顆骰給每人並即時檢查是否已達標
-  reveal(round, now) {
+  // T1:揭題。不自動發骰——玩家各自按「搖骰」開始(第一次 reroll 即首擲)
+  reveal(round) {
     if (round.phase !== 'countdown') return;
     round.phase = 'racing';
-    for (const id of round.order) round.dice[id] = rollDice(5);
-    for (const id of round.order) {
-      if (evalHand(round.dice[id]).arr[0] >= round.targetRank) markDone(round, id, now);
-    }
-    this.checkEarlyEnd(round);
   },
 
   handleAction(round, _match, player, action) {
@@ -80,9 +75,10 @@ export const speedMode = {
       const cur = round.dice[player.id] || rollDice(5);
       const fresh = rollDice(5);
       round.dice[player.id] = cur.map((v, i) => (locked.includes(i) ? v : (fresh[i] ?? v)));
-      round.rollSeq = (round.rollSeq || 0) + 1;
+      round.rolls[player.id] = (round.rolls[player.id] || 0) + 1;
       let achieved = false;
-      if (evalHand(round.dice[player.id]).arr[0] >= round.targetRank) {
+      // 「剛好」指定牌型才算達標(非該牌型以上)
+      if (evalHand(round.dice[player.id]).arr[0] === round.targetRank) {
         markDone(round, player.id, Date.now());
         achieved = true;
       }
@@ -118,6 +114,7 @@ export const speedMode = {
     delete round.doneAt[leftId];
     delete round.dice[leftId];
     delete round.locked[leftId];
+    delete round.rolls[leftId];
     return true;
   },
 
@@ -146,7 +143,7 @@ export const speedMode = {
       done: round.done,
       doneAt: round.doneAt,
       reveal: round.reveal,
-      rollSeq: round.rollSeq || 0,
+      rolls: round.rolls,
       startAt: round.startAt,
       targetAt: round.targetAt,
       deadlineAt: round.deadlineAt,

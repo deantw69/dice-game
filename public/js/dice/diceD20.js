@@ -177,17 +177,168 @@ function buildDie(style) {
 
 export function createRenderer(container, options = {}) {
   const style = options.style || 'violet';
+  const scatter = !!options.scatter; // true:骰子在容器內隨機散落,翻滾時撞來撞去(同吹牛骰盅內的散落感)
   let dice = [];
+  let tray = container;              // scatter 時改用內層相對定位 tray 當邊界
+
+  // ---- 散落 / 碰撞(scatter,移植自 diceCup;d20 已自帶 3D 翻滾,故碰撞用軸對齊方框即可)----
+  let BOX = 96;          // 量到的單顆 scene 尺寸(px),作為碰撞方框邊長基準
+  let positions = [];    // [{x, y}] scene 左上角
+  let layoutCount = 0;
+  let layoutDs = 96;     // 排版時實際採用的方框邊長(放不下會縮小)
+
+  const clampv = (v, max) => Math.min(max, Math.max(0, v));
+
+  // 嘗試用邊長 d 把 n 顆軸對齊方框不重疊地散落到 tray 內;成功回位置陣列,失敗回 null
+  function tryPlace(n, d) {
+    const W = (tray.clientWidth || 300) - d, H = (tray.clientHeight || 260) - d;
+    if (W < 0 || H < 0) return null;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      let placed = false;
+      for (let t = 0; t < 200; t++) {
+        const x = Math.random() * W, y = Math.random() * H;
+        if (pts.every((p) => !(x < p.x + d && x + d > p.x && y < p.y + d && y + d > p.y))) {
+          pts.push({ x, y }); placed = true; break;
+        }
+      }
+      if (!placed) return null;
+    }
+    return pts;
+  }
+  function layout(n, regen) {
+    if (!regen && positions.length === n) return;
+    let d = BOX, pts = null;
+    for (; d >= 32; d -= 8) { pts = tryPlace(n, d); if (pts) break; }
+    if (!pts) { d = 32; pts = tryPlace(n, d) || []; }
+    positions = pts.map((p) => ({ x: p.x, y: p.y }));
+    layoutDs = d; layoutCount = n;
+  }
+  function applyPositions() {
+    if (!scatter) return;
+    const s = layoutDs / BOX;
+    [...tray.querySelectorAll('.d20-scene')].forEach((el, i) => {
+      const p = positions[i]; if (!p) return;
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.style.transform = `scale(${s})`;
+    });
+  }
+
+  // ---- 翻滾時的「撞來撞去」動畫(2D 平移 + 軸對齊碰撞,逐漸阻尼停下)----
+  let rafId = null, animTimer = null;
+  function stopAnim() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+  }
+  function animateScatter() {
+    stopAnim();
+    const scenes = [...tray.querySelectorAll('.d20-scene')];
+    const n = scenes.length;
+    if (!scatter || !n) return;
+    const d = layoutDs;
+    const maxX = Math.max(0, (tray.clientWidth || 300) - d);
+    const maxY = Math.max(0, (tray.clientHeight || 260) - d);
+    const s = d / BOX;
+    // 由目前畫面位置起步(避免第一幀瞬移),再給隨機初速撞來撞去
+    const st = scenes.map((el) => {
+      const ox = parseFloat(el.style.left), oy = parseFloat(el.style.top);
+      return {
+        x: Number.isFinite(ox) ? clampv(ox, maxX) : Math.random() * maxX,
+        y: Number.isFinite(oy) ? clampv(oy, maxY) : Math.random() * maxY,
+        vx: (Math.random() * 2 - 1) * 360, vy: (Math.random() * 2 - 1) * 360,
+      };
+    });
+    const clamp = (o) => { o.x = clampv(o.x, maxX); o.y = clampv(o.y, maxY); };
+    const render = () => scenes.forEach((el, i) => {
+      el.style.left = st[i].x + 'px'; el.style.top = st[i].y + 'px';
+      el.style.transform = `scale(${s})`;
+    });
+    function separate(iters) {
+      for (let it = 0; it < iters; it++) {
+        let any = false;
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+          const a = st[i], b = st[j];
+          const ox = Math.min(a.x + d, b.x + d) - Math.max(a.x, b.x);
+          const oy = Math.min(a.y + d, b.y + d) - Math.max(a.y, b.y);
+          if (ox <= 0 || oy <= 0) continue;
+          any = true;
+          if (ox < oy) {                          // 沿 x 軸分離(穿透較淺)
+            const nx = a.x <= b.x ? 1 : -1, push = ox / 2 + 0.1;
+            a.x -= nx * push; b.x += nx * push;
+            const rel = (b.vx - a.vx) * nx;
+            if (rel < 0) { a.vx += nx * rel; b.vx -= nx * rel; } // 互相靠近才交換法線方向速度
+          } else {                                // 沿 y 軸分離
+            const ny = a.y <= b.y ? 1 : -1, push = oy / 2 + 0.1;
+            a.y -= ny * push; b.y += ny * push;
+            const rel = (b.vy - a.vy) * ny;
+            if (rel < 0) { a.vy += ny * rel; b.vy -= ny * rel; }
+          }
+          clamp(a); clamp(b);
+        }
+        if (!any) break;
+      }
+    }
+    const MAX = 1900;
+    let start = null, last = null, stillFrames = 0;
+    function commit() {
+      stopAnim();
+      separate(8);
+      positions = st.map((o) => ({ x: o.x, y: o.y }));
+      layoutCount = n;
+      applyPositions();
+    }
+    function frame(ts) {
+      if (start === null) { start = ts; last = ts; }
+      let dt = (ts - last) / 1000; if (dt > 0.05) dt = 0.05; last = ts;
+      const elapsed = ts - start;
+      const damp = Math.pow(0.972, dt * 60);     // 依時間阻尼,高刷新率螢幕衰減一致
+      const before = st.map((o) => ({ x: o.x, y: o.y }));
+      let moving = false;
+      for (const o of st) {
+        o.x += o.vx * dt; o.y += o.vy * dt;
+        if (o.x < 0) { o.x = 0; o.vx = -o.vx * 0.88; } else if (o.x > maxX) { o.x = maxX; o.vx = -o.vx * 0.88; }
+        if (o.y < 0) { o.y = 0; o.vy = -o.vy * 0.88; } else if (o.y > maxY) { o.y = maxY; o.vy = -o.vy * 0.88; }
+        o.vx *= damp; o.vy *= damp;
+        if (o.vx * o.vx + o.vy * o.vy < 100) { o.vx = 0; o.vy = 0; }
+        if (o.vx || o.vy) moving = true;
+      }
+      separate(5);
+      render();
+      if (!moving) { commit(); return; }
+      let maxStep = 0;
+      for (let i = 0; i < n; i++) maxStep = Math.max(maxStep, Math.hypot(st[i].x - before[i].x, st[i].y - before[i].y));
+      stillFrames = maxStep < 0.5 ? stillFrames + 1 : 0;
+      if (stillFrames >= 4 || elapsed > MAX) { commit(); return; }
+      rafId = requestAnimationFrame(frame);
+    }
+    rafId = requestAnimationFrame(frame);
+    animTimer = setTimeout(commit, MAX + 400);
+  }
 
   // 與 diceCup 一致:建立時就依 count 先渲染骰子(否則首次 roll 前畫面空白)
 
   function setCount(n) {
+    stopAnim();
     container.innerHTML = '';
     dice = [];
+    tray = container;
+    if (scatter) {
+      tray = document.createElement('div');
+      tray.className = 'd20-tray';
+      tray.style.cssText = 'position:relative;width:100%;height:100%;';
+      container.appendChild(tray);
+    }
     for (let i = 0; i < n; i++) {
       const d = buildDie(style);
-      container.appendChild(d.scene);
+      if (scatter) { d.scene.style.position = 'absolute'; d.scene.style.transformOrigin = '0 0'; }
+      tray.appendChild(d.scene);
       dice.push(d);
+    }
+    if (scatter) {
+      BOX = dice[0] ? (dice[0].scene.offsetWidth || 96) : 96;
+      layout(n, true);
+      applyPositions();
     }
   }
 
@@ -205,7 +356,9 @@ export function createRenderer(container, options = {}) {
 
   function setStatic(values) {
     if (values.length !== dice.length) setCount(values.length);
+    stopAnim();
     dice.forEach((d, i) => settle(d, landingR(faceFor(values[i]).n)));
+    if (scatter) { layout(values.length, values.length !== layoutCount); applyPositions(); }
   }
 
   // 以 rAF 連續剛體翻滾:繞「起點→落點」的旋轉軸多轉幾圈,每幀依世界空間
@@ -243,11 +396,14 @@ export function createRenderer(container, options = {}) {
   function rollTo(values, rollIdx) {
     if (values.length !== dice.length) setCount(values.length);
     const animSet = rollIdx ? new Set(rollIdx) : null;
-    return Promise.all(dice.map((d, i) => {
+    const p = Promise.all(dice.map((d, i) => {
       const Rl = landingR(faceFor(values[i]).n);
       if (animSet && !animSet.has(i)) { settle(d, Rl); return Promise.resolve(); }
       return spin(d, Rl);
     }));
+    // 3D 翻滾的同時,讓骰子在容器內撞來撞去散落(由目前位置起步,不瞬移)
+    if (scatter) animateScatter();
+    return p;
   }
 
   if (options.count) setCount(options.count);

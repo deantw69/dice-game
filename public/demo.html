@@ -30,8 +30,9 @@
 
   <script type="module">
     import { createRenderer as createCup } from '/js/dice/diceCup.js';
+    import { createRenderer as createD20 } from '/js/dice/diceD20.js';
 
-    // 各骰盅樣式(依序編號 #1、#2 …)
+    // 各樣式(依序編號 #1、#2 …)。faces 不填預設 6。
     const VARIANTS = [
       { title: '骰盅 ・ 紫盅 / 上掀',  tag: '喀啦音效 ・ 往上掀蓋',   make: (el, n) => createCup(el, { count: n, style: 'purple', lift: 'up',    sound: true }) },
       { title: '骰盅 ・ 木紋 / 上掀',  tag: '木紋盅 ・ 往上掀蓋',     make: (el, n) => createCup(el, { count: n, style: 'wood',   lift: 'up',    sound: true }) },
@@ -39,6 +40,9 @@
       { title: '骰盅 ・ 翡翠 / 傾倒',  tag: '翡翠綠 ・ 往側邊傾倒',   make: (el, n) => createCup(el, { count: n, style: 'jade',   lift: 'tilt',  sound: true }) },
       { title: '骰盅 ・ 黑曜 / 左滑',  tag: '黑曜亮面 ・ 往左滑開',   make: (el, n) => createCup(el, { count: n, style: 'dark',   lift: 'left',  sound: true }) },
       { title: '骰盅 ・ 木紋 / 傾倒',  tag: '木紋盅 ・ 往側邊傾倒',   make: (el, n) => createCup(el, { count: n, style: 'wood',   lift: 'tilt',  sound: true }) },
+      { title: '20 面骰 ・ 紫',  tag: 'd20 ・ 3D 翻滾 (1~20)', faces: 20, make: (el, n) => createD20(el, { style: 'violet',  count: n }) },
+      { title: '20 面骰 ・ 翡翠', tag: 'd20 ・ 3D 翻滾 (1~20)', faces: 20, make: (el, n) => createD20(el, { style: 'emerald', count: n }) },
+      { title: '20 面骰 ・ 緋紅', tag: 'd20 ・ 3D 翻滾 (1~20)', faces: 20, make: (el, n) => createD20(el, { style: 'crimson', count: n }) },
     ];
 
     const grid = document.getElementById('grid');
@@ -68,7 +72,7 @@
       });
     }
 
-    const randValues = (n) => Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
+    const randValues = (n, faces = 6) => Array.from({ length: n }, () => 1 + Math.floor(Math.random() * faces));
 
     let rolling = false;
     async function roll() {
@@ -76,13 +80,17 @@
       rolling = true;
       rollBtn.disabled = true;
       const n = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
-      const values = randValues(n);
       VARIANTS.forEach((_, i) => (document.getElementById('result-' + i).textContent = '搖骰中…'));
       // 靜音則暫時關掉音效:用全域旗標
       window.__cupMuted = muteBox.checked;
-      await Promise.all(renderers.map((r) => r.rollTo(values)));
-      const txt = `結果: ${values.join(' , ')}　(總和 ${values.reduce((a, b) => a + b, 0)})`;
-      VARIANTS.forEach((_, i) => (document.getElementById('result-' + i).textContent = txt));
+      // 每個樣式依自己的面數產生點數(d20 → 1~20)
+      const perValues = VARIANTS.map((v) => randValues(n, v.faces || 6));
+      await Promise.all(renderers.map((r, i) => r.rollTo(perValues[i])));
+      VARIANTS.forEach((_, i) => {
+        const vals = perValues[i];
+        document.getElementById('result-' + i).textContent =
+          `結果: ${vals.join(' , ')}　(總和 ${vals.reduce((a, b) => a + b, 0)})`;
+      });
       rollBtn.disabled = false;
       rolling = false;
     }

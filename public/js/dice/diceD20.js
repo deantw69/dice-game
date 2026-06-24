@@ -225,12 +225,10 @@ export function createRenderer(container, options = {}) {
   function applyPositions() {
     if (!scatter) return;
     const s = layoutDs / BOX;
-    [...tray.querySelectorAll('.d20-scene')].forEach((el, i) => {
-      const p = positions[i]; if (!p) return;
-      el.style.left = p.x + 'px';
-      el.style.top = p.y + 'px';
-      el.style.transform = `scale(${s})`;
-    });
+    for (let i = 0; i < dice.length; i++) {
+      const p = positions[i]; if (!p) continue;
+      dice[i].scene.style.transform = `translate(${p.x}px,${p.y}px) scale(${s})`;
+    }
   }
 
   // ---- 翻滾時的「撞來撞去」動畫(2D 平移 + 軸對齊碰撞,逐漸阻尼停下)----
@@ -241,27 +239,30 @@ export function createRenderer(container, options = {}) {
   }
   function animateScatter() {
     stopAnim();
-    const scenes = [...tray.querySelectorAll('.d20-scene')];
-    const n = scenes.length;
+    const n = dice.length;
     if (!scatter || !n) return;
     const d = layoutDs;
     const maxX = Math.max(0, (tray.clientWidth || 300) - d);
     const maxY = Math.max(0, (tray.clientHeight || 260) - d);
     const s = d / BOX;
-    // 由目前畫面位置起步(避免第一幀瞬移),再給隨機初速撞來撞去
-    const st = scenes.map((el) => {
-      const ox = parseFloat(el.style.left), oy = parseFloat(el.style.top);
-      return {
-        x: Number.isFinite(ox) ? clampv(ox, maxX) : Math.random() * maxX,
-        y: Number.isFinite(oy) ? clampv(oy, maxY) : Math.random() * maxY,
+    // 由目前 positions 起步(避免第一幀瞬移),再給隨機初速撞來撞去
+    const st = new Array(n);
+    const before = new Array(n);           // 預分配,每幀重用
+    for (let i = 0; i < n; i++) {
+      const p = positions[i];
+      st[i] = {
+        x: p ? clampv(p.x, maxX) : Math.random() * maxX,
+        y: p ? clampv(p.y, maxY) : Math.random() * maxY,
         vx: (Math.random() * 2 - 1) * 3000, vy: (Math.random() * 2 - 1) * 3000,
       };
-    });
+      before[i] = { x: 0, y: 0 };
+    }
     const clamp = (o) => { o.x = clampv(o.x, maxX); o.y = clampv(o.y, maxY); };
-    const render = () => scenes.forEach((el, i) => {
-      el.style.left = st[i].x + 'px'; el.style.top = st[i].y + 'px';
-      el.style.transform = `scale(${s})`;
-    });
+    function render() {
+      for (let i = 0; i < n; i++) {
+        dice[i].scene.style.transform = `translate(${st[i].x}px,${st[i].y}px) scale(${s})`;
+      }
+    }
     function separate(iters) {
       for (let it = 0; it < iters; it++) {
         let any = false;
@@ -271,12 +272,12 @@ export function createRenderer(container, options = {}) {
           const oy = Math.min(a.y + d, b.y + d) - Math.max(a.y, b.y);
           if (ox <= 0 || oy <= 0) continue;
           any = true;
-          if (ox < oy) {                          // 沿 x 軸分離(穿透較淺)
+          if (ox < oy) {
             const nx = a.x <= b.x ? 1 : -1, push = ox / 2 + 0.1;
             a.x -= nx * push; b.x += nx * push;
             const rel = (b.vx - a.vx) * nx;
-            if (rel < 0) { a.vx += nx * rel; b.vx -= nx * rel; } // 互相靠近才交換法線方向速度
-          } else {                                // 沿 y 軸分離
+            if (rel < 0) { a.vx += nx * rel; b.vx -= nx * rel; }
+          } else {
             const ny = a.y <= b.y ? 1 : -1, push = oy / 2 + 0.1;
             a.y -= ny * push; b.y += ny * push;
             const rel = (b.vy - a.vy) * ny;
@@ -287,12 +288,12 @@ export function createRenderer(container, options = {}) {
         if (!any) break;
       }
     }
-    const MAX = ROLL_MS; // 散落位移在 3D 翻滾露出最終面的那一刻就停,結尾不留小滑動
+    const MAX = ROLL_MS;
     let start = null, last = null, stillFrames = 0;
     function commit() {
       stopAnim();
       separate(8);
-      positions = st.map((o) => ({ x: o.x, y: o.y }));
+      for (let i = 0; i < n; i++) { positions[i] = { x: st[i].x, y: st[i].y }; }
       layoutCount = n;
       applyPositions();
     }
@@ -300,10 +301,11 @@ export function createRenderer(container, options = {}) {
       if (start === null) { start = ts; last = ts; }
       let dt = (ts - last) / 1000; if (dt > 0.05) dt = 0.05; last = ts;
       const elapsed = ts - start;
-      const damp = Math.pow(0.94, dt * 60);     // 中等阻尼,撞擊看得出來、近 ROLL_MS(露面)時減到很慢再定格;依時間衰減,高刷新率螢幕一致
-      const before = st.map((o) => ({ x: o.x, y: o.y }));
+      const damp = Math.pow(0.94, dt * 60);
+      for (let i = 0; i < n; i++) { before[i].x = st[i].x; before[i].y = st[i].y; }
       let moving = false;
-      for (const o of st) {
+      for (let i = 0; i < n; i++) {
+        const o = st[i];
         o.x += o.vx * dt; o.y += o.vy * dt;
         if (o.x < 0) { o.x = 0; o.vx = -o.vx * 0.88; } else if (o.x > maxX) { o.x = maxX; o.vx = -o.vx * 0.88; }
         if (o.y < 0) { o.y = 0; o.vy = -o.vy * 0.88; } else if (o.y > maxY) { o.y = maxY; o.vy = -o.vy * 0.88; }
@@ -315,8 +317,12 @@ export function createRenderer(container, options = {}) {
       render();
       if (!moving) { commit(); return; }
       let maxStep = 0;
-      for (let i = 0; i < n; i++) maxStep = Math.max(maxStep, Math.hypot(st[i].x - before[i].x, st[i].y - before[i].y));
-      stillFrames = maxStep < 0.5 ? stillFrames + 1 : 0;
+      for (let i = 0; i < n; i++) {
+        const dx = st[i].x - before[i].x, dy = st[i].y - before[i].y;
+        const step = dx * dx + dy * dy;       // 避免 hypot(開根號),比平方閾值即可
+        if (step > maxStep) maxStep = step;
+      }
+      stillFrames = maxStep < 0.25 ? stillFrames + 1 : 0;  // 0.5² = 0.25
       if (stillFrames >= 4 || elapsed > MAX) { commit(); return; }
       rafId = requestAnimationFrame(frame);
     }
@@ -339,7 +345,7 @@ export function createRenderer(container, options = {}) {
     }
     for (let i = 0; i < n; i++) {
       const d = buildDie(style);
-      if (scatter) { d.scene.style.position = 'absolute'; d.scene.style.transformOrigin = '0 0'; }
+      if (scatter) { d.scene.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0'; }
       tray.appendChild(d.scene);
       dice.push(d);
     }

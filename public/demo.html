@@ -89,29 +89,54 @@
 
     const randValues = (n, faces = 6) => Array.from({ length: n }, () => 1 + Math.floor(Math.random() * faces));
 
-    let rolling = false;
-    async function roll() {
-      if (rolling) return;
-      rolling = true;
-      rollBtn.disabled = true;
+    const holdState = { active: false, timer: null };
+
+    function pressRoll() {
+      if (holdState.active) return;
+      holdState.active = true;
+      rollBtn.classList.add('charging');
+      window.__cupMuted = muteBox.checked;
       const n = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
       VARIANTS.forEach((_, i) => (document.getElementById('result-' + i).textContent = '搖骰中…'));
-      // 靜音則暫時關掉音效:用全域旗標
-      window.__cupMuted = muteBox.checked;
-      // 每個樣式依自己的面數產生點數(d20 → 1~20)
+
+      renderers.forEach((r, i) => {
+        if (r.type === 'cup') { r.cover(); r.shake(); }
+        else r.rollTo(randValues(n, VARIANTS[i].faces || 6));
+      });
+      holdState.timer = setInterval(() => {
+        renderers.forEach((r, i) => {
+          if (r.type === 'cup') r.shake();
+          else r.rollTo(randValues(n, VARIANTS[i].faces || 6));
+        });
+      }, 360);
+    }
+
+    function releaseRoll() {
+      if (!holdState.active) return;
+      holdState.active = false;
+      rollBtn.classList.remove('charging');
+      clearInterval(holdState.timer);
+      const n = Math.max(1, Math.min(100, parseInt(countInput.value) || 1));
       const perValues = VARIANTS.map((v) => randValues(n, v.faces || 6));
-      await Promise.all(renderers.map((r, i) => r.rollTo(perValues[i])));
+      renderers.forEach((r, i) => {
+        if (r.type === 'cup') r.reveal(perValues[i]);
+        else r.rollTo(perValues[i]);
+      });
       VARIANTS.forEach((_, i) => {
         const vals = perValues[i];
         document.getElementById('result-' + i).textContent =
           `結果: ${vals.join(' , ')}　(總和 ${vals.reduce((a, b) => a + b, 0)})`;
       });
-      rollBtn.disabled = false;
-      rolling = false;
     }
 
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#roll')) { e.preventDefault(); pressRoll(); }
+    });
+    document.addEventListener('pointerup', () => releaseRoll());
+    document.addEventListener('pointercancel', () => releaseRoll());
+    window.addEventListener('blur', () => releaseRoll());
+
     countInput.addEventListener('change', build);
-    rollBtn.addEventListener('click', roll);
     build();
   </script>
 </body>

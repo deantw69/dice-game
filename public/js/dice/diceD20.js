@@ -279,7 +279,7 @@ export function createRenderer(container, options = {}) {
         if (!any) break;
       }
     }
-    const MAX = 1900;
+    const MAX = ROLL_MS; // 散落位移在 3D 翻滾露出最終面的那一刻就停,結尾不留小滑動
     let start = null, last = null, stillFrames = 0;
     function commit() {
       stopAnim();
@@ -292,7 +292,7 @@ export function createRenderer(container, options = {}) {
       if (start === null) { start = ts; last = ts; }
       let dt = (ts - last) / 1000; if (dt > 0.05) dt = 0.05; last = ts;
       const elapsed = ts - start;
-      const damp = Math.pow(0.972, dt * 60);     // 依時間阻尼,高刷新率螢幕衰減一致
+      const damp = Math.pow(0.945, dt * 60);     // 阻尼較強,讓位移在 ROLL_MS(露面)前自然停妥而非突然凍結;依時間衰減,高刷新率螢幕一致
       const before = st.map((o) => ({ x: o.x, y: o.y }));
       let moving = false;
       for (const o of st) {
@@ -313,7 +313,7 @@ export function createRenderer(container, options = {}) {
       rafId = requestAnimationFrame(frame);
     }
     rafId = requestAnimationFrame(frame);
-    animTimer = setTimeout(commit, MAX + 400);
+    animTimer = setTimeout(commit, MAX + 200);
   }
 
   // 與 diceCup 一致:建立時就依 count 先渲染骰子(否則首次 roll 前畫面空白)

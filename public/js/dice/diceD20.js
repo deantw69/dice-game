@@ -135,12 +135,19 @@ function axisAngle(R) {
 // 依骰子目前朝向 R,用「世界空間」法線重新打光,讓面隨視角呈現明暗(立體感關鍵)
 function shade(d, R) {
   const base = d.base;
-  d.faces.forEach((fc) => {
-    const wn = applyR(R, fc.n);                       // 世界空間法線
+  for (let i = 0; i < d.faces.length; i++) {
+    const fc = d.faces[i];
+    const wn = applyR(R, fc.n);
+    if (wn[2] < -0.15) continue;                         // 背面跳過
     const k = 0.34 + 0.66 * Math.max(0, dot(wn, LIGHT));
-    const c = base.map((v) => Math.round(Math.min(255, v * k)));
-    fc.el.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
-  });
+    const r = Math.min(255, base[0] * k + 0.5) | 0;
+    const g = Math.min(255, base[1] * k + 0.5) | 0;
+    const b = Math.min(255, base[2] * k + 0.5) | 0;
+    const rgb = (r << 16) | (g << 8) | b;
+    if (fc.lastRgb === rgb) continue;                     // 顏色沒變不寫 DOM
+    fc.lastRgb = rgb;
+    fc.el.style.background = `rgb(${r},${g},${b})`;
+  }
 }
 
 function buildDie(style) {
@@ -149,6 +156,7 @@ function buildDie(style) {
   scene.className = 'd20-scene';
   const die = document.createElement('div');
   die.className = 'd20';
+  die.style.willChange = 'transform';
   const box = GEO.faceR * 2;
   const faces = GEO.faces.map((f, i) => {
     const face = document.createElement('div');

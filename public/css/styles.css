@@ -254,7 +254,7 @@ input[type="number"], input[type="text"] {
 .cup-tray.scatter { position: relative; flex-wrap: nowrap; width: 58%; max-width: 200px; height: 150px; }
 .cup-scene .cup-tray.scatter .die3d-scene { position: absolute; }
 /* 盅內骰子翻滾時間較短(掀蓋後露出來才看得到動) */
-.cup-tray .die3d { transition: transform 0.8s cubic-bezier(.2,.85,.25,1); }
+.cup-tray .die3d { transition: transform 1.2s cubic-bezier(.2,.85,.25,1); }
 /* 骰子尺寸由 --ds 動態控制(依數量縮放,確保不超出骰盅)。
    用 .cup-scene 前綴提高特異度,蓋過 .dice-stage 的固定 56px/34px 規則(否則盅內骰子會被鎖死、數量多時凸出盅外) */
 .cup-scene .cup-tray .die3d-scene, .cup-scene .cup-tray .die3d, .cup-scene .cup-tray .die3d .face { width: var(--ds); height: var(--ds); }

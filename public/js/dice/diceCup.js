@@ -163,8 +163,8 @@ export function createRenderer(container, options = {}) {
         x: Number.isFinite(ox) ? Math.min(maxX, Math.max(0, ox)) : Math.random() * maxX,
         y: Number.isFinite(oy) ? Math.min(maxY, Math.max(0, oy)) : Math.random() * maxY,
         a: Number.isFinite(or) ? or : Math.random() * 360,
-        vx: (Math.random() * 2 - 1) * 320, vy: (Math.random() * 2 - 1) * 320,
-        va: (Math.random() * 2 - 1) * 680,
+        vx: (Math.random() * 2 - 1) * 440, vy: (Math.random() * 2 - 1) * 440,
+        va: (Math.random() * 2 - 1) * 820,
       };
     });
     const render = () => scenes.forEach((el, i) => {
@@ -196,7 +196,9 @@ export function createRenderer(container, options = {}) {
         if (!any) break;
       }
     }
-    const MAX = 1900; // 最長動畫時間(ms)保底
+    // 散落位移須在「露出最終面」(盅內骰子 .cup-tray .die3d 的 CSS transition 結束)那一刻
+    // 同步停止,結尾才不會有小滑動。MAX 對齊露面時間;阻尼亦調強讓位移在此前自然停妥。
+    const MAX = 1800;
     let start = null, last = null, stillFrames = 0;
     function commit() {                           // 定格在目前(已不重疊)位置
       stopAnim();
@@ -212,8 +214,8 @@ export function createRenderer(container, options = {}) {
       // 阻尼改為「依時間」而非「依幀」:高刷新率螢幕(iPhone/MacBook 的 120Hz ProMotion)
       // 與一般 60Hz 的衰減速度才一致,否則高刷新率下動能掉太快、骰子還重疊就停住,
       // 剩 separate() 每幀互推來回振盪 → 快停時一直抖。以 60fps 為基準換算每幀係數。
-      const damp = Math.pow(0.972, dt * 60);
-      const dampA = Math.pow(0.96, dt * 60);
+      const damp = Math.pow(0.955, dt * 60);
+      const dampA = Math.pow(0.945, dt * 60);
       const before = st.map((s) => ({ x: s.x, y: s.y }));
       let moving = false;
       for (const s of st) {

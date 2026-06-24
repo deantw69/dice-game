@@ -246,7 +246,7 @@ export function createRenderer(container, options = {}) {
       return {
         x: Number.isFinite(ox) ? clampv(ox, maxX) : Math.random() * maxX,
         y: Number.isFinite(oy) ? clampv(oy, maxY) : Math.random() * maxY,
-        vx: (Math.random() * 2 - 1) * 360, vy: (Math.random() * 2 - 1) * 360,
+        vx: (Math.random() * 2 - 1) * 3000, vy: (Math.random() * 2 - 1) * 3000,
       };
     });
     const clamp = (o) => { o.x = clampv(o.x, maxX); o.y = clampv(o.y, maxY); };
@@ -292,7 +292,7 @@ export function createRenderer(container, options = {}) {
       if (start === null) { start = ts; last = ts; }
       let dt = (ts - last) / 1000; if (dt > 0.05) dt = 0.05; last = ts;
       const elapsed = ts - start;
-      const damp = Math.pow(0.945, dt * 60);     // 阻尼較強,讓位移在 ROLL_MS(露面)前自然停妥而非突然凍結;依時間衰減,高刷新率螢幕一致
+      const damp = Math.pow(0.94, dt * 60);     // 中等阻尼,撞擊看得出來、近 ROLL_MS(露面)時減到很慢再定格;依時間衰減,高刷新率螢幕一致
       const before = st.map((o) => ({ x: o.x, y: o.y }));
       let moving = false;
       for (const o of st) {

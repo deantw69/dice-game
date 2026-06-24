@@ -214,15 +214,22 @@ export function createRenderer(container, options = {}) {
     return new Promise((resolve) => {
       if (d.raf) { cancelAnimationFrame(d.raf); d.raf = 0; }
       const Rstart = d.R;
+      // 對齊用的測地線旋轉:把 Rstart 轉到落點 Rl(角度小、不負責「多圈」)
       const { axis, angle } = axisAngle(matMul(Rl, transpose(Rstart)));
-      const turns = 4 + ((Math.random() * 3) | 0);     // 額外整圈數 → 看起來轉得快
-      const total = angle + 2 * Math.PI * turns;        // 多轉整圈不影響最終落點
+      // 翻滾主體:繞「隨機方向軸」整數圈翻滾,每次擲骰方向都不同;
+      // 因為是整數圈(2π 倍數),回到單位旋轉,不影響最終落點。
+      const tumbleAxis = norm([Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5]);
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const turns = 3 + ((Math.random() * 3) | 0);      // 整圈數 → 轉得快又夠亂
+      const tumble = dir * 2 * Math.PI * turns;
       const ease = (t) => 1 - Math.pow(1 - t, 3);
       let t0 = 0;
       const step = (now) => {
         if (!t0) t0 = now;
         const p = Math.min(1, (now - t0) / ROLL_MS);
-        const R = matMul(rotAxis(axis, total * ease(p)), Rstart);
+        const e = ease(p);
+        // 先繞隨機軸翻滾(整圈),再做測地線對齊;p=1 時翻滾歸零 → 精準落在 Rl
+        const R = matMul(rotAxis(axis, angle * e), matMul(rotAxis(tumbleAxis, tumble * e), Rstart));
         d.die.style.transform = m3(R);
         shade(d, R);
         if (p < 1) { d.raf = requestAnimationFrame(step); }

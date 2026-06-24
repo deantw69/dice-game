@@ -36,6 +36,7 @@ let speedClockTimer = null;   // 手速骰:本地倒數/計時 interval
 let speedLastCountN = null;   // 手速骰:上次倒數播音的數字(避免同秒重複播)
 let speedSkew = 0;            // 手速骰:client 與 server 的時鐘偏移(Date.now() - serverNow)
 let speedLastMyRolls = 0;     // 手速骰:上次 render 時自己的搖骰次數(用來在「我剛搖完」時播骰子動畫)
+let speedLastRolls = {};      // 手速骰:上次 render 時各「他人」的搖骰次數(用來在他人剛搖完時播骰子動畫)
 let speedRollReadyAt = 0;     // 手速骰:下次可擲骰的時間(連續擲骰冷卻 1.5 秒,前端同步顯示)
 let speedCooldownTimer = null;// 手速骰:冷卻倒數的 re-render 計時器
 let speedRolling = false;     // 手速骰:骰子動畫是否進行中(延遲達標顯示)
@@ -1162,7 +1163,7 @@ function renderBoard() {
         stage.innerHTML = '<div class="waiting">準備…</div>';
         diceCache.delete('cell-' + p.id);
         info.textContent = '';
-        if (p.id === myId) { speedLastMyRolls = 0; speedRollReadyAt = 0; speedRolling = false; clearTimeout(speedRollingTimer); } // 新一局:重置
+        if (p.id === myId) { speedLastMyRolls = 0; speedLastRolls = {}; speedRollReadyAt = 0; speedRolling = false; clearTimeout(speedRollingTimer); } // 新一局:重置
       } else if (p.id === myId) {
         // 自己:活骰 / 結束攤開;偵測「剛搖完」播動畫 + 延遲達標顯示
         const dice = g.myDice || [];
@@ -1194,10 +1195,18 @@ function renderBoard() {
             : '<span class="speed-badge go">⏳ 搶骰中</span>';
         }
       } else {
-        // 他人(racing 時只看狀態徽章);結束後全員攤開骰子
+        // 他人:racing 即時顯示其骰子(他人剛搖完時播滾動動畫);結束後全員攤開
         const dice = (g.dice && g.dice[p.id]) || [];
-        if (ended && dice.length) {
-          showDice(stage, 'cell-' + p.id, dice, false, true);
+        if (dice.length) {
+          const theirRolls = (g.rolls && g.rolls[p.id]) || 0;
+          if (!ended && theirRolls !== (speedLastRolls[p.id] || 0)) {
+            const lockedSet = new Set((g.locked && g.locked[p.id]) || []);
+            const rollIdx = dice.map((_, i) => i).filter((i) => !lockedSet.has(i));
+            showDice(stage, 'cell-' + p.id, dice, false, false, rollIdx);
+            speedLastRolls[p.id] = theirRolls;
+          } else {
+            showDice(stage, 'cell-' + p.id, dice, false, true);
+          }
         } else {
           stage.innerHTML = '';
           diceCache.delete('cell-' + p.id);

@@ -163,7 +163,7 @@ export function createRenderer(container, options = {}) {
         x: Number.isFinite(ox) ? Math.min(maxX, Math.max(0, ox)) : Math.random() * maxX,
         y: Number.isFinite(oy) ? Math.min(maxY, Math.max(0, oy)) : Math.random() * maxY,
         a: Number.isFinite(or) ? or : Math.random() * 360,
-        vx: (Math.random() * 2 - 1) * 440, vy: (Math.random() * 2 - 1) * 440,
+        vx: (Math.random() * 2 - 1) * 880, vy: (Math.random() * 2 - 1) * 880,
         va: (Math.random() * 2 - 1) * 820,
       };
     });
@@ -214,7 +214,7 @@ export function createRenderer(container, options = {}) {
       // 阻尼改為「依時間」而非「依幀」:高刷新率螢幕(iPhone/MacBook 的 120Hz ProMotion)
       // 與一般 60Hz 的衰減速度才一致,否則高刷新率下動能掉太快、骰子還重疊就停住,
       // 剩 separate() 每幀互推來回振盪 → 快停時一直抖。以 60fps 為基準換算每幀係數。
-      const damp = Math.pow(0.955, dt * 60);
+      const damp = Math.pow(0.94, dt * 60);
       const dampA = Math.pow(0.945, dt * 60);
       const before = st.map((s) => ({ x: s.x, y: s.y }));
       let moving = false;

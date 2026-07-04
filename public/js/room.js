@@ -405,24 +405,6 @@ function renderWinnerBanner() {
 }
 
 // 輸到 10 的倍數次 → 嘲諷 popup(延遲 2.5 秒,讓輸家 popup 先亮)
-const TAUNT_TEMPLATES = [
-  (n, c) => `${n} 已經輸 ${c} 次了，加油好嗎？`,
-  (n, c) => `${n} 輸了 ${c} 次！是在練習輸嗎？`,
-  (n, c) => `恭喜 ${n} 達成 ${c} 敗的里程碑！`,
-  (n, c) => `${n} ${c} 連敗！要不要考慮改行？`,
-  (n, c) => `${n} 已經輸 ${c} 次了，骰子都替你哭了`,
-  (n, c) => `${n} 第 ${c} 敗！穩定輸出，從不讓人失望`,
-  (n, c) => `輸神降臨！${n} ${c} 敗達成 🫡`,
-  (n, c) => `${n} 輸 ${c} 次了，要頒個獎給你嗎？`,
-  (n, c) => `${n} ${c} 敗！這個手氣建議去買刮刮樂反著刮`,
-  (n, c) => `${n} 輸到 ${c} 次了⋯⋯是不是該換個暱稱重新做人？`,
-  (n, c) => `${n} 再接再厲！離 ${c + 10} 敗只差一點點了 💪`,
-  (n, c) => `${n} ${c} 敗！你的運氣大概都給隔壁了`,
-  (n, c) => `${n}，輸 ${c} 次不可恥，可恥的是還不認輸`,
-  (n, c) => `${n} ${c} 敗成就解鎖！🏅 敗者為王`,
-  (n, c) => `${n} 穩穩地輸了 ${c} 次，堪稱輸界傳奇`,
-];
-const TAUNT_ICONS = ['🤡', '💀', '😂', '😭', '🎉', '👏', '🫣', '😈', '🥲'];
 function renderMilestone() {
   const el = $('milestonePopup');
   const ms = state && state.lossMilestone;
@@ -443,11 +425,8 @@ function renderMilestone() {
     milestoneTimer = null;
     lastMilestoneKey = key;
     milestoneDismissed = '';
-    const icon = TAUNT_ICONS[Math.floor(Math.random() * TAUNT_ICONS.length)];
-    const lines = ms.map((m) => {
-      const tmpl = TAUNT_TEMPLATES[Math.floor(Math.random() * TAUNT_TEMPLATES.length)];
-      return `<div>${esc(tmpl(m.name, m.count))}</div>`;
-    }).join('');
+    const icon = ms[0].icon || '🤡';
+    const lines = ms.map((m) => `<div>${esc(m.text)}</div>`).join('');
     el.innerHTML = `<div class="milestone-card">`
       + `<div class="milestone-icon">${icon}</div>`
       + `<div class="milestone-text">${lines}</div>`

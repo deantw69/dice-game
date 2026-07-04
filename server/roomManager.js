@@ -203,6 +203,11 @@ export function reorderPlayers(room, orderedIds) {
   return { room };
 }
 
+// 顛倒玩家順序
+export function reversePlayers(room) {
+  room.players.reverse();
+}
+
 // 隨機打亂玩家順序(Fisher-Yates)
 export function shufflePlayers(room) {
   const a = room.players;

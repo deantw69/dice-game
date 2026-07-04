@@ -443,7 +443,10 @@ button.danger:hover { filter: brightness(1.08); }
   transition: transform .28s ease, opacity .28s ease;
 }
 .roster-float.collapsed { transform: translateX(calc(100% + 20px)); opacity: 0; pointer-events: none; }
-.roster-collapse { display: block; margin: 0 0 8px auto; }
+.roster-top { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+#rosterOrderBtns { display: flex; gap: 4px; }
+#rosterOrderBtns .mini { padding: 2px 8px; font-size: var(--fs-sm); }
+.roster-collapse { display: block; margin-left: auto; }
 .roster-open {
   position: fixed; right: 12px; bottom: 12px; z-index: 26;
   padding: 8px 14px; font-size: var(--fs-sm);

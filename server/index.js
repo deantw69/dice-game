@@ -165,6 +165,16 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
+  socket.on('reversePlayers', (_payload, cb) => {
+    const room = rm.findRoomBySocket(socket.id);
+    if (!room) return cb?.({ error: '尚未加入房間' });
+    const me = playerBySocket(room, socket.id);
+    if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能顛倒順序' });
+    rm.reversePlayers(room);
+    cb?.({ ok: true });
+    broadcastRoom(room);
+  });
+
   // 房主手動排序玩家(只在大廳;開局後順序已鎖進回合)
   socket.on('reorderPlayers', ({ order } = {}, cb) => {
     const room = rm.findRoomBySocket(socket.id);

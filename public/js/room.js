@@ -200,8 +200,6 @@ function render() {
 
   // 房主才看得到「強制重來」與「自動下一場」(頂部常駐,隨時可勾)
   $('forceReset').style.display = state.you.isHost ? '' : 'none';
-  // 「打亂玩家順序」:房主、在大廳、且多於 1 人才顯示(開局後順序鎖定)
-  $('shuffle').style.display = (state.you.isHost && state.status === 'lobby' && state.players.length > 1) ? '' : 'none';
   // 吹牛骰整個模式都是吹牛 → 不提供自動下一場;混合模式仍顯示(僅吹牛子玩法那局不自動)
   $('autoNextWrap').style.display = (state.you.isHost && state.modeId !== 'liars') ? '' : 'none';
   // 「我要暫離」:正式玩家才看得到(觀戰中/已暫離不顯示)
@@ -597,6 +595,16 @@ $('modeInfoPopup')?.addEventListener('click', (e) => {
 
 function renderRoster() {
   const el = $('rosterBody');
+  const canReorderGlobal = !roundEndAnim && state.you.isHost && state.status === 'lobby' && state.players.length > 1;
+  const ob = $('rosterOrderBtns');
+  if (ob) {
+    ob.innerHTML = canReorderGlobal
+      ? '<button class="mini secondary" id="rosterShuffle" type="button" title="打亂玩家順序">🔀</button>'
+        + '<button class="mini secondary" id="rosterReverse" type="button" title="顛倒玩家順序">🔄</button>'
+      : '';
+    ob.querySelector('#rosterShuffle')?.addEventListener('click', () => act('shufflePlayers', {}));
+    ob.querySelector('#rosterReverse')?.addEventListener('click', () => act('reversePlayers', {}));
+  }
   const playerRow = (p, extra = '', opts = {}) => {
     const isHost = p.id === state.hostId;
     const me = p.id === myId ? ' (你)' : '';
@@ -1720,11 +1728,6 @@ function closeQr() { $('qrOverlay').style.display = 'none'; }
 $('shareQr').addEventListener('click', () => {
   document.querySelector('.room-top')?.classList.remove('menu-open'); // 收起手機選單
   openQr();
-});
-// 打亂玩家順序(僅房主、大廳、多於 1 人;按鈕常駐選單,顯示由 render 控制)
-$('shuffle').addEventListener('click', () => {
-  document.querySelector('.room-top')?.classList.remove('menu-open'); // 收起手機選單
-  act('shufflePlayers', {});
 });
 $('qrClose').addEventListener('click', closeQr);
 $('qrOverlay').addEventListener('click', (e) => { if (e.target === $('qrOverlay')) closeQr(); });

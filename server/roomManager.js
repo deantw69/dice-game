@@ -270,7 +270,7 @@ export function viewFor(room, viewerId) {
     autoRotate: !!room.autoRotate,
     blackjackLives: room.blackjackLives ?? 3,
     rouletteLives: room.rouletteLives ?? 3,
-    roulettePasses: room.roulettePasses ?? 1,
+    rouletteAbility: room.rouletteAbility ?? 2,
     speedSeconds: room.speedSeconds ?? 30,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

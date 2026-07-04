@@ -763,8 +763,9 @@ function renderLobby() {
     html += `<div class="lobby-row"><span class="label">每人生命</span>
       <input id="rouletteLives" type="number" min="0" max="10" value="${state.rouletteLives}" /></div>`;
     html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
-    html += `<div class="lobby-row"><span class="label">每輪可跳過</span>
-      <input id="roulettePasses" type="number" min="0" max="3" value="${state.roulettePasses}" /></div>`;
+    html += `<div class="lobby-row"><span class="label">特殊功能次數</span>
+      <input id="rouletteAbility" type="number" min="0" max="5" value="${state.rouletteAbility}" /></div>`;
+    html += `<div class="lobby-row hint">每輪可分配至「跳過」與「迴轉」</div>`;
   }
   if (state.modeId === 'blackjack21') {
     html += `<div class="lobby-row"><span class="label">每人生命</span>
@@ -795,7 +796,7 @@ function renderLobby() {
   $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
   $('speedSeconds')?.addEventListener('change', (e) => act('setSpeedSeconds', { value: e.target.value }));
   $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
-  $('roulettePasses')?.addEventListener('change', (e) => act('setRoulettePasses', { value: e.target.value }));
+  $('rouletteAbility')?.addEventListener('change', (e) => act('setRouletteAbility', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
   $('start')?.addEventListener('click', () => act('startRound', {}));
@@ -938,6 +939,10 @@ function renderBanner() {
       const w = state.players.find((p) => p.id === state.winnerId);
       return show(`🏆 <strong>${esc(w ? w.name : '')}</strong> 獲勝!`);
     }
+    if (state.status === 'playing' && g.phase === 'allocating') {
+      const readyCount = g.order ? g.order.filter((id) => g.allocReady && g.allocReady[id]).length : 0;
+      return show(`🎯 分配特殊功能中… (${readyCount}/${(g.order || []).length} 已確認)`);
+    }
     if (state.status === 'playing' && g.phase === 'playing') {
       const curId = (g.order || [])[g.turnIndex];
       const isMy = curId === myId;
@@ -946,8 +951,9 @@ function renderBanner() {
         : g.total >= (range.min || 99) ? ' warn' : '';
       const rangeHint = range.min ? ` <small>(${range.min}~${range.max})</small>` : '';
       const lastInfo = g.lastRoll ? ` ・ ⚡ <span class="hl">${nm(g.lastRoll.playerId)}</span> 自動骰 ${g.lastRoll.value}` : '';
+      const dirIcon = g.direction === -1 ? ' 🔄' : '';
       return show(
-        `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ???${rangeHint}</span>`
+        `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ???${rangeHint}</span>${dirIcon}`
         + (g.autoRolling ? lastInfo : (isMy ? ' ・ 👉 <strong>輪到你!</strong>' : ` ・ ⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`)),
       );
     }
@@ -1215,10 +1221,10 @@ function renderBoard() {
         diceCache.delete('cell-' + p.id);
       }
       // 最近動作
-      const last = [...(g.history || [])].reverse().find((h) => h.playerId === p.id);
-      if (last) {
-        info.textContent = last.action === 'pass' ? '跳過' : `擲出 ${last.value}`;
+      if (g.phase === 'allocating') {
+        info.textContent = g.allocReady && g.allocReady[p.id] ? '✅ 已確認' : '⏳ 分配中…';
       } else {
+        const last = [...(g.history || [])].reverse().find((h) => h.playerId === p.id);
         info.textContent = '';
       }
     } else if (g.mode === 'blackjack21') {
@@ -1443,18 +1449,67 @@ function renderControls() {
   }
 
   if (g.mode === 'roulette' && state.status === 'playing') {
+    if (g.phase === 'allocating') {
+      const pts = g.abilityPoints || 0;
+      const myAlloc = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
+      const ready = g.allocReady && g.allocReady[myId];
+      const readyCount = g.order ? g.order.filter((id) => g.allocReady && g.allocReady[id]).length : 0;
+      if (ready) {
+        el.innerHTML = `<p class="muted">已分配(⏭️${myAlloc.passes} / 🔄${myAlloc.reverses}),等待其他玩家… (${readyCount}/${(g.order || []).length})</p>`;
+      } else {
+        const p = myAlloc.passes;
+        const r = myAlloc.reverses;
+        el.innerHTML = '<div class="alloc-panel">'
+          + `<div class="alloc-title">分配特殊功能 (共 ${pts} 點)</div>`
+          + '<div class="alloc-row">'
+          + `<span>⏭️ 跳過</span>`
+          + `<button class="alloc-btn" data-adj="pass-1"${p <= 0 ? ' disabled' : ''}>−</button>`
+          + `<span class="alloc-num" id="allocPass">${p}</span>`
+          + `<button class="alloc-btn" data-adj="pass+1"${p + r >= pts ? ' disabled' : ''}>+</button>`
+          + '</div>'
+          + '<div class="alloc-row">'
+          + `<span>🔄 迴轉</span>`
+          + `<button class="alloc-btn" data-adj="rev-1"${r <= 0 ? ' disabled' : ''}>−</button>`
+          + `<span class="alloc-num" id="allocRev">${r}</span>`
+          + `<button class="alloc-btn" data-adj="rev+1"${p + r >= pts ? ' disabled' : ''}>+</button>`
+          + '</div>'
+          + `<button id="allocConfirm"${p + r !== pts ? ' disabled' : ''}>✅ 確認 (${p + r}/${pts})</button>`
+          + '</div>';
+        el.querySelectorAll('[data-adj]').forEach((btn) => btn.addEventListener('click', () => {
+          const a = btn.dataset.adj;
+          const cur = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
+          let np = cur.passes, nr = cur.reverses;
+          if (a === 'pass+1' && np + nr < pts) np++;
+          else if (a === 'pass-1' && np > 0) np--;
+          else if (a === 'rev+1' && np + nr < pts) nr++;
+          else if (a === 'rev-1' && nr > 0) nr--;
+          else return;
+          act('action', { type: 'allocate', passes: np, reverses: nr });
+        }));
+        $('allocConfirm')?.addEventListener('click', () => {
+          const cur = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
+          act('action', { type: 'allocate', passes: cur.passes, reverses: cur.reverses, confirm: true });
+        });
+      }
+      return;
+    }
     if (g.phase === 'playing') {
       if (g.autoRolling) {
         el.innerHTML = '<p class="muted">⚡ 安全區快速骰…</p>';
       } else {
         const curId = (g.order || [])[g.turnIndex];
         if (curId === myId) {
-          const passLeft = (g.maxPasses || 0) - ((g.passes && g.passes[myId]) || 0);
+          const myAlloc = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
+          const passLeft = myAlloc.passes - ((g.passes && g.passes[myId]) || 0);
+          const revLeft = myAlloc.reverses - ((g.reverses && g.reverses[myId]) || 0);
           const passDisabled = passLeft <= 0 ? ' disabled' : '';
-          el.innerHTML = '<div class="bid-row">'
+          const revDisabled = revLeft <= 0 ? ' disabled' : '';
+          el.innerHTML = '<div class="bid-row roulette-actions">'
             + rollBtn('🎲 搖骰!')
-            + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️ 跳過 (剩 ${Math.max(0, passLeft)})</button>`
+            + `<button id="rouletteReverse" class="secondary"${revDisabled}>🔄迴轉(${Math.max(0, revLeft)})</button>`
+            + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️跳過(${Math.max(0, passLeft)})</button>`
             + '</div>';
+          $('rouletteReverse')?.addEventListener('click', () => act('action', { type: 'reverse' }));
           $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
         } else {
           const nm = state.players.find((x) => x.id === curId);

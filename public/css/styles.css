@@ -697,6 +697,17 @@ button.danger:hover { filter: brightness(1.08); }
 .dot.on { background: var(--success); }
 .dot.off { background: var(--offline); }
 .bid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bid-row button { white-space: nowrap; }
+.bid-row.roulette-actions { flex-wrap: nowrap; }
+.bid-row.roulette-actions button { flex-shrink: 1; min-width: 0; font-size: var(--fs-sm); }
+.alloc-panel { text-align: center; }
+.alloc-title { font-weight: 700; margin-bottom: 10px; font-size: var(--fs-lg); }
+.alloc-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; font-size: var(--fs-lg); }
+.alloc-row > span:first-child { min-width: 80px; text-align: right; white-space: nowrap; }
+.alloc-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1.2rem; font-weight: 700; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+.alloc-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
+.alloc-btn:disabled { opacity: .35; cursor: not-allowed; }
+.alloc-num { font-size: var(--fs-xl); font-weight: 700; min-width: 28px; text-align: center; }
 .bj-hit-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 8px; }
 .bj-hit-row::before { content: '要牌顆數'; font-size: var(--fs-sm); color: var(--muted); margin-right: 4px; }
 .bj-hit-n { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border); background: var(--input-bg); color: var(--text); font-size: var(--fs-lg); font-weight: 700; cursor: pointer; transition: all .15s; }

@@ -119,12 +119,12 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
-  socket.on('setRoulettePasses', ({ value }, cb) => {
+  socket.on('setRouletteAbility', ({ value }, cb) => {
     const room = rm.findRoomBySocket(socket.id);
     if (!room) return cb?.({ error: '尚未加入房間' });
     const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
-    room.roulettePasses = Math.max(0, Math.min(3, parseInt(value) || 1));
+    room.rouletteAbility = Math.max(0, Math.min(5, parseInt(value) || 2));
     cb?.({ ok: true });
     broadcastRoom(room);
   });

@@ -19,14 +19,14 @@ export const russianRoulette = {
   name: '驚爆骰',
   minPlayers: 2,
 
-  initMatch(players, { lives = 3, maxPasses = 1 } = {}) {
+  initMatch(players, { lives = 3, abilityPoints = 2 } = {}) {
     const l = {};
     for (const p of players) l[p.id] = lives;
     return {
       lives: l,
       eliminated: [],
       startLives: lives,
-      maxPasses,
+      abilityPoints,
       nextStarter: null,
     };
   },
@@ -46,17 +46,32 @@ export const russianRoulette = {
       turnIndex = order.indexOf(match.nextStarter);
     }
 
-    const passes = {};
-    for (const id of order) passes[id] = 0;
+    const needAllocate = match.abilityPoints > 0;
+    const alloc = {};
+    const allocReady = {};
+    const prev = match.lastAlloc || {};
+    for (const id of order) {
+      const p = prev[id];
+      if (p && (p.passes + p.reverses) === match.abilityPoints) {
+        alloc[id] = { passes: p.passes, reverses: p.reverses };
+      } else {
+        alloc[id] = { passes: 0, reverses: 0 };
+      }
+      allocReady[id] = false;
+    }
 
     return {
-      phase: 'playing',
+      phase: needAllocate ? 'allocating' : 'playing',
       order,
       turnIndex,
+      direction: 1,
       total: 0,
       bustThreshold,
       bustRange: range,
-      passes,
+      alloc,
+      allocReady,
+      passes: {},
+      reverses: {},
       lastRoll: null,
       history: [],
       bustPlayer: null,
@@ -66,6 +81,30 @@ export const russianRoulette = {
 
   handleAction(round, match, player, action, _players) {
     if (!round.order.includes(player.id)) return { error: '你不在本局中' };
+
+    if (round.phase === 'allocating') {
+      if (action.type === 'allocate') {
+        const pts = match.abilityPoints;
+        const p = parseInt(action.passes) || 0;
+        const r = parseInt(action.reverses) || 0;
+        if (p < 0 || r < 0) return { error: '次數不能為負' };
+        if (p + r > pts) return { error: `總和不能超過 ${pts}` };
+        round.alloc[player.id] = { passes: p, reverses: r };
+        round.allocReady[player.id] = (p + r === pts) && !!action.confirm;
+        if (round.order.every((id) => round.allocReady[id])) {
+          round.phase = 'playing';
+          match.lastAlloc = {};
+          for (const id of round.order) {
+            round.passes[id] = 0;
+            round.reverses[id] = 0;
+            match.lastAlloc[id] = { ...round.alloc[id] };
+          }
+        }
+        return { ok: true };
+      }
+      return { error: '請先分配特殊功能次數' };
+    }
+
     if (round.phase !== 'playing') return { error: '本輪已結束' };
 
     const currentId = round.order[round.turnIndex];
@@ -94,12 +133,23 @@ export const russianRoulette = {
       return { ok: true };
     }
 
+    if (action.type === 'reverse') {
+      const maxR = (round.alloc[player.id] || {}).reverses || 0;
+      const used = round.reverses[player.id] || 0;
+      if (used >= maxR) return { error: '迴轉次數已用完' };
+      round.reverses[player.id] = used + 1;
+      round.direction *= -1;
+      round.history.push({ playerId: player.id, action: 'reverse', total: round.total });
+      advanceTurn(round);
+      return { ok: true };
+    }
+
     if (action.type === 'pass') {
-      if ((round.passes[player.id] || 0) >= match.maxPasses) {
-        return { error: `每輪最多跳過 ${match.maxPasses} 次` };
-      }
-      if (match.maxPasses <= 0) return { error: '本場不允許跳過' };
-      round.passes[player.id] = (round.passes[player.id] || 0) + 1;
+      const maxP = (round.alloc[player.id] || {}).passes || 0;
+      const used = round.passes[player.id] || 0;
+      if (maxP <= 0) return { error: '沒有分配跳過次數' };
+      if (used >= maxP) return { error: '跳過次數已用完' };
+      round.passes[player.id] = used + 1;
       round.history.push({ playerId: player.id, action: 'pass', total: round.total });
       advanceTurn(round);
       return { ok: true };
@@ -130,12 +180,15 @@ export const russianRoulette = {
       phase: round.phase,
       order: round.order,
       turnIndex: round.turnIndex,
+      direction: round.direction,
       total: round.total,
       bustRange: round.bustRange,
-      // 爆掉後才揭曉門檻,遊戲中隱藏
       bustThreshold: round.bustPlayer ? round.bustThreshold : null,
-      maxPasses: match.maxPasses,
+      abilityPoints: match.abilityPoints,
+      alloc: round.alloc,
+      allocReady: round.allocReady,
       passes: round.passes,
+      reverses: round.reverses,
       lastRoll: round.lastRoll,
       history: round.history,
       bustPlayer: round.bustPlayer,
@@ -154,7 +207,8 @@ export const russianRoulette = {
 };
 
 function advanceTurn(round) {
-  round.turnIndex = (round.turnIndex + 1) % round.order.length;
+  const len = round.order.length;
+  round.turnIndex = ((round.turnIndex + (round.direction || 1)) % len + len) % len;
 }
 
 // 累計 + 最大骰面(6) 仍不會碰到門檻下限 → 還在安全區

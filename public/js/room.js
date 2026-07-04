@@ -866,13 +866,16 @@ function renderBanner() {
         : `等待 <span class="hl">${nm(g.chooserId)}</span> 決定要拿掉哪一種…`);
     }
     if (state.status === 'playing' && g.phase === 'pickLoser') {
-      return show(state.you.isHost ? '👇 請選出本輪輸家' : '⏳ 等待房主選出輸家…');
+      const grabber = g.reveal && g.reveal.grabberId ? (() => { const p = state.players.find((x) => x.id === g.reveal.grabberId); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; })() : '';
+      const grabMsg = grabber ? ` (${grabber} 抓的)` : '';
+      return show(state.you.isHost ? `👇 請選出本輪輸家${grabMsg}` : `⏳ 等待房主選出輸家…${grabMsg}`);
     }
     if (g.reveal && !g.reveal.pending) {
       const r = g.reveal;
       if (r.subGame === 'bluff') {
         const nm2 = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
-        return show(`✊ 開盅! ・ 💀 ${nm2(r.loserId)} 輸了! ・ 房主可按「再來一場」`);
+        const grabber = r.grabberId ? nm2(r.grabberId) : '';
+        return show(`✊ ${grabber ? `${grabber} 開盅!` : '開盅!'} ・ 💀 ${nm2(r.loserId)} 輸了! ・ 房主可按「再來一場」`);
       }
       if (r.subGame === 'poker') {
         if (r.loserId) {
@@ -975,12 +978,14 @@ function renderBanner() {
       return show(`🎲 各自搖骰中(<strong>${done}/${total}</strong> 已搖完),全員搖完才能抓`);
     }
     if (g.reveal) {
+      const grabber = g.reveal.grabberId ? (() => { const p = state.players.find((x) => x.id === g.reveal.grabberId); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; })() : '';
       if (g.phase === 'pickLoser') {
-        return show(state.you.isHost ? '👇 請選出本輪輸家' : '⏳ 等待房主選出輸家…');
+        const grabMsg = grabber ? ` (${grabber} 抓的)` : '';
+        return show(state.you.isHost ? `👇 請選出本輪輸家${grabMsg}` : `⏳ 等待房主選出輸家…${grabMsg}`);
       }
       const nmL = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
-      if ((g.reveal.losers || []).length) return show(`✊ 開盅! ・ 💀 ${nmL(g.reveal.losers[0])} 輸了!`);
-      return show('✊ 開盅!');
+      if ((g.reveal.losers || []).length) return show(`✊ ${grabber ? `${grabber} 開盅!` : '開盅!'} ・ 💀 ${nmL(g.reveal.losers[0])} 輸了!`);
+      return show(grabber ? `✊ ${grabber} 開盅!` : '✊ 開盅!');
     }
   }
   el.style.display = 'none';

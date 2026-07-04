@@ -52,7 +52,7 @@ export const liarsDice = {
       if (!round.order.every((id) => round.rolled.includes(id))) {
         return { error: '還有人沒搖骰' };
       }
-      doReveal(round);
+      doReveal(round, player.id);
       return { ok: true, revealed: true };
     }
 
@@ -100,11 +100,11 @@ export const liarsDice = {
   },
 };
 
-function doReveal(round) {
+function doReveal(round, grabberId) {
   const stats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const id of round.order) {
     for (const d of round.hands[id] || []) stats[d] = (stats[d] || 0) + 1;
   }
   round.phase = 'pickLoser'; // 等房主選輸家後才進 roundEnd
-  round.reveal = { hands: round.hands, stats, losers: [], pending: true };
+  round.reveal = { hands: round.hands, stats, losers: [], pending: true, grabberId };
 }

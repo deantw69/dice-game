@@ -133,7 +133,7 @@ export const mixedMode = {
       if (!round.order.every((id) => round.rolled.includes(id))) {
         return { error: '還有人沒搖骰' };
       }
-      resolveBluff(round, match);
+      resolveBluff(round, match, player.id);
       return { ok: true, revealed: true };
     }
 
@@ -296,7 +296,7 @@ export const mixedMode = {
 };
 
 // 吹牛開盅:統計各點數數量,公開所有骰子;等房主選輸家後才結束本場
-function resolveBluff(round, match) {
+function resolveBluff(round, match, grabberId) {
   const stats = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const id of round.order) {
     for (const d of round.hands[id] || []) stats[d] = (stats[d] || 0) + 1;
@@ -310,6 +310,7 @@ function resolveBluff(round, match) {
     removed: {},
     losers: [],
     pending: true, // 等房主選輸家
+    grabberId,
   };
 }
 

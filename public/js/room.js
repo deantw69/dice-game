@@ -1236,7 +1236,14 @@ function renderBoard() {
       if (!hand) { stage.innerHTML = ''; info.textContent = ''; }
       else if (g.phase === 'rolling') {
         if (p.id === myId && g.myDice && g.myDice.length) {
-          showDice(stage, 'cell-' + p.id, g.myDice);
+          const newCount = g.myDice.length;
+          if (bjMyDiceCount > 0 && newCount > bjMyDiceCount) {
+            const rollIdx = Array.from({ length: newCount - bjMyDiceCount }, (_, i) => bjMyDiceCount + i);
+            showDice(stage, 'cell-' + p.id, g.myDice, false, false, rollIdx);
+          } else {
+            showDice(stage, 'cell-' + p.id, g.myDice);
+          }
+          bjMyDiceCount = newCount;
           info.textContent = `點數 ${g.myTotal}`;
         } else if (hand.diceCount > 0) {
           showDice(stage, 'cell-' + p.id, Array(hand.diceCount).fill(0), true);
@@ -1248,6 +1255,7 @@ function renderBoard() {
         }
       } else {
         // reveal / roundEnd: 全部翻開
+        bjMyDiceCount = 0;
         if (hand.dice && hand.dice.length) {
           showDice(stage, 'cell-' + p.id, hand.dice, false, true);
           info.textContent = (hand.bust ? '💥 爆了! ' : '') + `點數 ${hand.total}`;
@@ -1631,6 +1639,7 @@ function esc(s) {
 
 // ---- 21 點骰:玩家選擇要牌顆數 ----
 let bjHitCount = 1;
+let bjMyDiceCount = 0;
 
 // ---- 按住搖骰:按住時骰子一直轉,放開才送出搖骰並停在結果 ----
 const rollSpin = { active: false, committing: false, timer: null, seqAtPress: -1 };

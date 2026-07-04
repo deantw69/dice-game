@@ -490,13 +490,11 @@ button.danger:hover { filter: brightness(1.08); }
 /* 只顯示自己時(吹牛骰抓之前):單一格置中加寬,骰子橫向鋪開 */
 #board.solo .board-cell { flex-basis: 100%; max-width: 480px; }
 /* 自己的格子:金色邊 + 呼吸脈衝光暈,與其他玩家的透明細邊形成強對比 */
-.board-cell.mine { background: linear-gradient(160deg, #2c3a72, #3a2e78); border: 2px solid var(--accent); animation: minePulse 1.4s ease-in-out infinite; }
-@keyframes minePulse { 0%,100% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 3px var(--accent); } 50% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 6px rgba(255,204,77,0.3); } }
+.board-cell.mine { background: linear-gradient(160deg, #2c3a72, #3a2e78); border: 2px solid var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 3px var(--accent); }
 /* 話胚:牌型最小的玩家(可重骰/認輸)→ 紅框(偏負面:快輸了) */
 .board-cell.lowest { box-shadow: 0 0 0 3px var(--lose); }
 /* 正在等待此玩家做決定(選玩法 / 選條件)→ 青色呼吸光暈(中性聚焦,與「最小者」紅框區隔) */
-.board-cell.deciding { box-shadow: 0 0 0 3px var(--accent2); animation: turnPulse 1.4s ease-in-out infinite; }
-@keyframes turnPulse { 0%,100% { box-shadow: 0 0 0 3px var(--accent2); } 50% { box-shadow: 0 0 0 6px rgba(77,208,255,0.35); } }
+.board-cell.deciding { box-shadow: 0 0 0 3px var(--accent2); }
 /* 本局輸家公告(話胚 / 紅黑單雙 決出輸家):獨立大字區 */
 /* 本局輸家 popup:置中浮現卡片;pointer-events:none → 純視覺,不擋按鈕 */
 .loser-popup { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; }

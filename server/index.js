@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 
 import * as rm from './roomManager.js';
 import * as gc from './gameController.js';
+import { MODE_LIST } from './games/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
@@ -26,14 +27,14 @@ function broadcastRoomList() {
 }
 
 // 把房間狀態(個人化視圖)推送給每位成員
-function broadcastRoom(room) {
+function broadcastRoom(room, { listChanged = false } = {}) {
   if (!room) return;
   for (const p of [...room.players, ...room.spectators, ...(room.away || [])]) {
     if (p.connected && p.socketId) {
       io.to(p.socketId).emit('roomState', rm.viewFor(room, p.id));
     }
   }
-  broadcastRoomList();
+  if (listChanged) broadcastRoomList();
 }
 
 io.on('connection', (socket) => {
@@ -52,7 +53,8 @@ io.on('connection', (socket) => {
     const { room, player } = res;
     socket.join(room.code);
     cb?.({ ok: true, code: room.code, playerId: player.id });
-    broadcastRoom(room);
+    socket.emit('modes', MODE_LIST);
+    broadcastRoom(room, { listChanged: true });
   });
 
   socket.on('joinRoom', ({ code, name }, cb) => {
@@ -63,7 +65,8 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     socket.join(code);
     cb?.({ ok: true, code, playerId: res.player.id, asSpectator: res.asSpectator });
-    broadcastRoom(res.room);
+    socket.emit('modes', MODE_LIST);
+    broadcastRoom(res.room, { listChanged: true });
   });
 
   // 重連 / 重新整理後回到房間
@@ -73,6 +76,7 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     socket.join(code);
     cb?.({ ok: true, code });
+    socket.emit('modes', MODE_LIST);
     broadcastRoom(res.room);
   });
 
@@ -83,7 +87,7 @@ io.on('connection', (socket) => {
     const res = gc.setMode(room, me.id, modeId);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   socket.on('setDiceCount', ({ count }, cb) => {
@@ -205,7 +209,7 @@ io.on('connection', (socket) => {
     const res = gc.startRound(room, me.id);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
     if (room.modeId === 'speed') armSpeedTimers(room); // 手速骰:排程揭題/截止計時器
     if (room.modeId === 'roulette') armRouletteAutoRoll(room); // 驚爆骰:安全區自動骰
   });
@@ -215,10 +219,11 @@ io.on('connection', (socket) => {
     if (!room) return cb?.({ error: '尚未加入房間' });
     const me = playerBySocket(room, socket.id);
     if (!me) return cb?.({ error: '找不到你的座位' });
+    const prevStatus = room.status;
     const res = gc.handleAction(room, me, action || {});
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true, cooldown: res.cooldown, retryMs: res.retryMs });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: room.status !== prevStatus });
     if (room.modeId === 'roulette') armRouletteAutoRoll(room); // 驚爆骰:手動骰後繼續自動骰
     // 手速骰:達標判定延遲到骰子動畫跑完,所有玩家同步看到結果
     if (res.pendingAchieve) {
@@ -237,7 +242,7 @@ io.on('connection', (socket) => {
       if (leftId) rm.removePlayer(room, leftId);
       socket.leave(room.code);
       if (leftId) gc.onPlayerLeft(room, leftId); // 離開後重新判定回合
-      broadcastRoom(room);
+      broadcastRoom(room, { listChanged: true });
     }
     cb?.({ ok: true });
   });
@@ -249,7 +254,7 @@ io.on('connection', (socket) => {
     const res = gc.forceReset(room, me.id);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   socket.on('transferHost', ({ targetId }, cb) => {
@@ -284,7 +289,7 @@ io.on('connection', (socket) => {
     rm.removePlayer(room, targetId);
     gc.onPlayerLeft(room, targetId); // 踢人後重新判定回合
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   // 房主把(閒置)玩家丟入暫離觀戰區
@@ -298,7 +303,7 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     gc.onPlayerLeft(room, targetId); // 移出後重新判定回合
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   // 玩家把自己丟入暫離觀戰區(房主自己暫離會自動把房主轉給下一位)
@@ -311,7 +316,7 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     gc.onPlayerLeft(room, me.id); // 移出後重新判定回合
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   // 暫離玩家按「我回來了」→ 回到 spectators(下一局加入)
@@ -323,17 +328,17 @@ io.on('connection', (socket) => {
     const res = rm.imBack(room, me.id);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
-    broadcastRoom(room);
+    broadcastRoom(room, { listChanged: true });
   });
 
   socket.on('disconnect', (reason) => {
     console.log(`[socket] disconnected: ${socket.id} (${reason})`);
     rm.handleDisconnect(socket.id, (room, pid) => {
       gc.onPlayerLeft(room, pid); // 逾時移除後重新判定回合
-      broadcastRoom(room);
+      broadcastRoom(room, { listChanged: true });
     });
     const room = rm.findRoomBySocket(socket.id);
-    broadcastRoom(room); // 立即反映「離線」狀態
+    broadcastRoom(room, { listChanged: true }); // 立即反映「離線」狀態
   });
 });
 

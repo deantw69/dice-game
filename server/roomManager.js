@@ -258,7 +258,6 @@ export function viewFor(room, viewerId) {
     rouletteLives: room.rouletteLives ?? 3,
     roulettePasses: room.roulettePasses ?? 1,
     speedSeconds: room.speedSeconds ?? 30,
-    modes: MODE_LIST,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     away: (room.away || []).map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

@@ -68,7 +68,15 @@ async function doRejoin() {
   }
 }
 socket.on('connect', doRejoin);
-socket.on('roomState', (s) => { state = s; render(); });
+let modes = [];
+socket.on('modes', (m) => { modes = m; });
+let renderPending = false;
+function scheduleRender() {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => { renderPending = false; render(); });
+}
+socket.on('roomState', (s) => { state = s; state.modes = modes; scheduleRender(); });
 
 // 被房主踢出
 socket.on('kicked', () => {
@@ -850,7 +858,7 @@ function scheduleSpeedCooldownRender() {
   if (speedCooldownTimer) return;
   speedCooldownTimer = setInterval(() => {
     if (Date.now() >= speedRollReadyAt) { clearInterval(speedCooldownTimer); speedCooldownTimer = null; }
-    if (state) render();
+    if (state) scheduleRender();
   }, 100);
 }
 
@@ -1809,7 +1817,9 @@ function onDeviceMotion(e) {
   if (shakeState.idleTimer) clearTimeout(shakeState.idleTimer);
   shakeState.idleTimer = setTimeout(() => releaseRoll(), SHAKE_STOP_MS); // 停手 → 定骰
 }
-window.addEventListener('devicemotion', onDeviceMotion);
+function addMotionListener() { window.addEventListener('devicemotion', onDeviceMotion); }
+function removeMotionListener() { window.removeEventListener('devicemotion', onDeviceMotion); shakeState.last = null; }
+if (shakeRoll) addMotionListener();
 // iOS 13+ 需在使用者手勢中向 DeviceMotionEvent 申請動作感測權限
 async function requestMotionPermission() {
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -1826,6 +1836,9 @@ $('shakeRoll').addEventListener('change', async (e) => {
   if (e.target.checked) {
     const ok = await requestMotionPermission();
     if (!ok) { e.target.checked = false; return; }
+    addMotionListener();
+  } else {
+    removeMotionListener();
   }
   shakeRoll = e.target.checked;
   localStorage.setItem('dice.shakeRoll', shakeRoll ? '1' : '0');

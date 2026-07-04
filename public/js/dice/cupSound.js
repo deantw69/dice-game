@@ -132,7 +132,7 @@ export function playVictory() {
   note(t0 + 1.18, 2093.00, 0.30, 0.2); // C7 高八度作結
 }
 
-// 炸彈爆炸:低頻轟隆爆裂 + 次低音衝擊 + 碎裂尾音(俄羅斯輪盤爆掉時播)
+// 炸彈爆炸:低頻轟隆爆裂 + 次低音衝擊 + 碎裂尾音(驚爆骰爆掉時播)
 export function playExplosion() {
   if (typeof window !== 'undefined' && window.__cupMuted) return; // 靜音
   const ac = ctx();

@@ -1,4 +1,4 @@
-// 俄羅斯輪盤骰:輪流搖 1 顆骰,累加總和,超過隱藏門檻就爆掉扣命,最後活著的贏
+// 驚爆骰:輪流搖 1 顆骰,累加總和,超過隱藏門檻就爆掉扣命,最後活著的贏
 import { rollDice } from '../util/rng.js';
 
 // 依存活人數動態產生爆掉門檻範圍,每回合隨機取值
@@ -16,7 +16,7 @@ function randomBust(playerCount) {
 
 export const russianRoulette = {
   id: 'roulette',
-  name: '俄羅斯輪盤骰',
+  name: '驚爆骰',
   minPlayers: 2,
 
   initMatch(players, { lives = 3, maxPasses = 1 } = {}) {
@@ -141,14 +141,35 @@ export const russianRoulette = {
       bustPlayer: round.bustPlayer,
       lives: match.lives,
       reveal: round.reveal || null,
+      autoRolling: isSafeZone(round),
     };
   },
 
   privateView() {
     return {};
   },
+
+  isSafeZone(round) { return isSafeZone(round); },
+  autoRollOnce(round) { return autoRollOnce(round); },
 };
 
 function advanceTurn(round) {
   round.turnIndex = (round.turnIndex + 1) % round.order.length;
+}
+
+// 累計 + 最大骰面(6) 仍不會碰到門檻下限 → 還在安全區
+function isSafeZone(round) {
+  return round.phase === 'playing' && round.total + 6 <= round.bustRange.min;
+}
+
+// 自動骰一步(由 index.js 計時器逐步驅動,每步 broadcast 讓前端播動畫)
+function autoRollOnce(round) {
+  if (!isSafeZone(round)) return false;
+  const playerId = round.order[round.turnIndex];
+  const value = rollDice(1)[0];
+  round.total += value;
+  round.lastRoll = { playerId, value };
+  round.history.push({ playerId, action: 'roll', value, total: round.total, auto: true });
+  advanceTurn(round);
+  return true;
 }

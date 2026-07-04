@@ -197,6 +197,7 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
     broadcastRoom(room);
     if (room.modeId === 'speed') armSpeedTimers(room); // 手速骰:排程揭題/截止計時器
+    if (room.modeId === 'roulette') armRouletteAutoRoll(room); // 驚爆骰:安全區自動骰
   });
 
   socket.on('action', (action, cb) => {
@@ -208,6 +209,7 @@ io.on('connection', (socket) => {
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true, cooldown: res.cooldown, retryMs: res.retryMs });
     broadcastRoom(room);
+    if (room.modeId === 'roulette') armRouletteAutoRoll(room); // 驚爆骰:手動骰後繼續自動骰
     // 手速骰:達標判定延遲到骰子動畫跑完,所有玩家同步看到結果
     if (res.pendingAchieve) {
       const { pendingAchieve: pid, rollSeq, speedId } = res;
@@ -347,6 +349,17 @@ function armSpeedTimers(room) {
     gc.speedTimeout(room);
     broadcastRoom(room);
   }, Math.max(0, round.deadlineAt - now));
+}
+
+const ROULETTE_AUTO_DELAY = 400; // ms between each auto-roll step
+function armRouletteAutoRoll(room) {
+  if (!gc.rouletteNeedsAutoRoll(room)) return;
+  setTimeout(() => {
+    if (!room.round || room.status !== 'playing' || room.modeId !== 'roulette') return;
+    if (!gc.rouletteAutoRollOnce(room)) return;
+    broadcastRoom(room);
+    armRouletteAutoRoll(room);
+  }, ROULETTE_AUTO_DELAY);
 }
 
 function playerBySocket(room, socketId) {

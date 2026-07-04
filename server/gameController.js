@@ -167,6 +167,16 @@ export function speedTimeout(room) {
   if (room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
 }
 
+// 驚爆骰:安全區自動骰(由 index.js 計時器逐步驅動)
+export function rouletteNeedsAutoRoll(room) {
+  if (room.modeId !== 'roulette' || !room.round) return false;
+  return MODES.roulette.isSafeZone(room.round);
+}
+export function rouletteAutoRollOnce(room) {
+  if (room.modeId !== 'roulette' || !room.round) return false;
+  return MODES.roulette.autoRollOnce(room.round);
+}
+
 // 具備整場狀態(initMatch)的模式 → 吹牛骰 / 混合模式
 function isMatchMode(mode) {
   return mode && typeof mode.initMatch === 'function';

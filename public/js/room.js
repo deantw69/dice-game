@@ -339,7 +339,7 @@ function renderLoserBanner() {
     + `<div class="loser-name">${names}</div>${reason}`
     + `</div>`;
   el.style.display = 'flex';
-  // 俄羅斯輪盤爆掉 → 播炸彈爆炸特效 + 爆炸音效;其餘模式維持嘲諷小號
+  // 驚爆骰爆掉 → 播炸彈爆炸特效 + 爆炸音效;其餘模式維持嘲諷小號
   if (state.game && state.game.mode === 'roulette') {
     playBombFx();
     playExplosion();
@@ -552,10 +552,11 @@ $('pokerRankPopup')?.addEventListener('click', (e) => {
 // 各模式規則說明:左下角 info icon → 點了彈出 popup(僅這幾個模式有)
 const MODE_RULES = {
   roulette: `<div class="rank-card">
-    <h3>🔫 俄羅斯輪盤骰</h3>
+    <h3>💣 驚爆骰</h3>
     <p>輪流行動的<b>淘汰制</b>骰子遊戲。每回合會隨機產生一個隱藏的「爆掉門檻」,你只看得到可能範圍。</p>
     <p>輪到你時擲骰,點數會累加進總和。總和一旦超過門檻就<b>爆掉</b>,當回合你輸、扣一條命。</p>
     <p>門檻範圍依存活人數決定(最小 = 人數×5,最大 = 人數×10),爆掉後才揭曉實際門檻。</p>
+    <p>累計點數尚在<b>安全區</b>時(加上最大骰面仍不可能碰到門檻下限),系統會自動快速骰過。</p>
     <p class="muted">生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。命歸零者被淘汰,最後存活者獲勝。</p>
   </div>`,
   blackjack21: `<div class="rank-card">
@@ -906,9 +907,10 @@ function renderBanner() {
       const danger = g.total >= (range.max || 99) ? ' danger'
         : g.total >= (range.min || 99) ? ' warn' : '';
       const rangeHint = range.min ? ` <small>(${range.min}~${range.max})</small>` : '';
+      const lastInfo = g.lastRoll ? ` ・ ⚡ <span class="hl">${nm(g.lastRoll.playerId)}</span> 自動骰 ${g.lastRoll.value}` : '';
       return show(
         `<span class="roulette-total${danger}">累計 <strong>${g.total}</strong> / ???${rangeHint}</span>`
-        + (isMy ? ' ・ 👉 <strong>輪到你!</strong>' : ` ・ ⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`),
+        + (g.autoRolling ? lastInfo : (isMy ? ' ・ 👉 <strong>輪到你!</strong>' : ` ・ ⏳ 等待 <span class="hl">${nm(curId)}</span> 行動…`)),
       );
     }
     if (g.bustPlayer) {
@@ -1373,18 +1375,22 @@ function renderControls() {
 
   if (g.mode === 'roulette' && state.status === 'playing') {
     if (g.phase === 'playing') {
-      const curId = (g.order || [])[g.turnIndex];
-      if (curId === myId) {
-        const passLeft = (g.maxPasses || 0) - ((g.passes && g.passes[myId]) || 0);
-        const passDisabled = passLeft <= 0 ? ' disabled' : '';
-        el.innerHTML = '<div class="bid-row">'
-          + rollBtn('🎲 搖骰!')
-          + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️ 跳過 (剩 ${Math.max(0, passLeft)})</button>`
-          + '</div>';
-        $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
+      if (g.autoRolling) {
+        el.innerHTML = '<p class="muted">⚡ 安全區快速骰…</p>';
       } else {
-        const nm = state.players.find((x) => x.id === curId);
-        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`;
+        const curId = (g.order || [])[g.turnIndex];
+        if (curId === myId) {
+          const passLeft = (g.maxPasses || 0) - ((g.passes && g.passes[myId]) || 0);
+          const passDisabled = passLeft <= 0 ? ' disabled' : '';
+          el.innerHTML = '<div class="bid-row">'
+            + rollBtn('🎲 搖骰!')
+            + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️ 跳過 (剩 ${Math.max(0, passLeft)})</button>`
+            + '</div>';
+          $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
+        } else {
+          const nm = state.players.find((x) => x.id === curId);
+          el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`;
+        }
       }
     } else {
       el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
@@ -1572,7 +1578,7 @@ function rollDiceCount() {
 function myRollRegistered() {
   const g = state && state.game; if (!g) return true;
   if (g.mode === 'roll') return !!(g.rolls && g.rolls[myId]);
-  if (g.mode === 'roulette') return g.phase !== 'playing' || (g.order || [])[g.turnIndex] !== myId;
+  if (g.mode === 'roulette') return g.autoRolling || g.phase !== 'playing' || (g.order || [])[g.turnIndex] !== myId;
   if (g.mode === 'blackjack21') return g.phase !== 'rolling' || (g.actionSeq || 0) !== rollSpin.seqAtPress;
   return (g.rolled || []).includes(myId);
 }

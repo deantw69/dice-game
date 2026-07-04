@@ -499,7 +499,7 @@ button.danger:hover { filter: brightness(1.08); }
 .loser-popup .loser-name { font-size: 2.8rem; font-weight: 900; color: var(--lose); line-height: 1.2; text-shadow: 0 2px 12px rgba(255,93,108,0.55); }
 .loser-popup .loser-reason { margin-top: 8px; font-size: 1.15rem; color: var(--lose-text); }
 .loser-popup .loser-hint { margin-top: 10px; font-size: var(--fs-xs); }
-/* 炸彈爆炸特效(俄羅斯輪盤爆掉時) — 在輸家 popup 之上、滿版置中,純視覺不擋點擊 */
+/* 炸彈爆炸特效(驚爆骰爆掉時) — 在輸家 popup 之上、滿版置中,純視覺不擋點擊 */
 .bomb-fx { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
 .bomb-fx .bomb-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,240,200,0.95), rgba(255,140,40,0.4) 35%, transparent 70%); animation: bombFlash .55s ease-out forwards; }
 @keyframes bombFlash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }

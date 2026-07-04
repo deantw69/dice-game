@@ -53,6 +53,7 @@ export function playAlert() {
   };
   beep(t, 880);        // 第一聲
   beep(t + 0.16, 1175); // 第二聲(higher)
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 }
 
 // 倒數「督」聲:短促低沉的提示音(手速骰 3-2-1 倒數用)

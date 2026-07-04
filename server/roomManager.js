@@ -52,6 +52,7 @@ export function createRoom(name, socketId, customCode) {
     round: null,         // 當前一輪
     winnerId: null,
     losses: {},          // playerId -> 累計輸的次數
+    lossHistory: {},     // name -> 累計輸的次數(離開後保留,重新加入時繼承)
     lastLosers: [],      // 上一場的輸家(供「由輸家決定」用)
     loserDecides: false, // 混合模式:由上一局輸家決定玩法(房主開關)
     autoRotate: false,   // 紅黑單雙:之後每骰由列表順位下一位決定條件(房主開關)
@@ -67,6 +68,12 @@ export function joinRoom(code, name, socketId) {
   const uniqueName = uniqueNameInRoom(room, name);
 
   const player = makePlayer(uniqueName, socketId);
+  // 繼承離開前的輸場紀錄
+  if (room.lossHistory?.[uniqueName]) {
+    if (!room.losses) room.losses = {};
+    room.losses[player.id] = room.lossHistory[uniqueName];
+    delete room.lossHistory[uniqueName];
+  }
   if (room.status === 'playing') {
     room.spectators.push(player);
     return { room, player, asSpectator: true };
@@ -150,6 +157,13 @@ export function handleDisconnect(socketId, onTimeout) {
 }
 
 export function removePlayer(room, playerId) {
+  // 離開前把 loss 記錄存到 lossHistory(以暱稱為 key），重新加入時可繼承
+  const member = allMembers(room).find((p) => p.id === playerId);
+  if (member && room.losses?.[playerId]) {
+    if (!room.lossHistory) room.lossHistory = {};
+    room.lossHistory[member.name] = room.losses[playerId];
+  }
+
   room.players = room.players.filter((p) => p.id !== playerId);
   room.spectators = room.spectators.filter((p) => p.id !== playerId);
   room.away = (room.away || []).filter((p) => p.id !== playerId);

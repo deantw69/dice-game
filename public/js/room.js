@@ -1383,7 +1383,10 @@ function renderBoard() {
       if (r && r.endsWith('豹子')) { bestRank = 'leopard'; bestLabel = r; break; }
       if (r === '鐵支' && bestRank !== 'leopard') { bestRank = 'iron'; bestLabel = r; }
     }
-    const fxKey = bestRank + ':' + JSON.stringify(g.reveal.ranks);
+    const handIds = Object.entries(g.reveal.ranks)
+      .filter(([, r]) => r === '鐵支' || (r && r.endsWith('豹子')))
+      .map(([id, r]) => id + ':' + r).sort().join(',');
+    const fxKey = bestRank + ':' + handIds;
     if (bestRank && fxKey !== lastHandFxKey) {
       lastHandFxKey = fxKey;
       if (bestRank === 'leopard') playLeopardFx(bestLabel);

@@ -246,6 +246,7 @@ export function viewFor(room, viewerId) {
     matchOver: room.matchOver,
     winnerId: room.winnerId,
     losses: room.losses || {},
+    lossMilestone: room.lossMilestone || null,
     loserDecides: !!room.loserDecides,
     autoRotate: !!room.autoRotate,
     blackjackLives: room.blackjackLives ?? 3,

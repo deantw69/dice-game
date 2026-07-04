@@ -108,6 +108,7 @@ export function startRound(room, playerId) {
 
   room.round.hostId = room.hostId; // 供各模式的 pickLoser 驗證
   room.status = 'playing';
+  room.lossMilestone = null;
   return { ok: true };
 }
 
@@ -187,6 +188,7 @@ function recordLosses(room) {
   room.lastChooserId = (room.round && room.round.chooserId) || null;
   if (!room.losses) room.losses = {};
   for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
+  checkLossMilestone(room, uniq);
 }
 
 // 吹牛骰:本輪房主選出的輸家計一次「輸的次數」(每輪僅計一次)
@@ -205,6 +207,21 @@ function recordRoundLosers(room) {
   room.lastLosers = uniq;
   if (!room.losses) room.losses = {};
   for (const id of uniq) room.losses[id] = (room.losses[id] || 0) + 1;
+  checkLossMilestone(room, uniq);
+}
+
+// 輸到 10 的倍數次 → 存 lossMilestone 供前端彈嘲諷 popup
+function checkLossMilestone(room, loserIds) {
+  const milestones = [];
+  for (const id of loserIds) {
+    const cnt = room.losses[id];
+    if (cnt && cnt >= 10 && cnt % 10 === 0) {
+      const p = [...room.players, ...room.spectators, ...(room.away || [])]
+        .find((x) => x.id === id);
+      if (p) milestones.push({ id, name: p.name, count: cnt });
+    }
+  }
+  room.lossMilestone = milestones.length ? milestones : null;
 }
 
 // 「由輸家決定」(順位制):從上一場「選條件的人」往下順位,

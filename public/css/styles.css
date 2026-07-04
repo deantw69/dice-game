@@ -626,7 +626,7 @@ button.danger:hover { filter: brightness(1.08); }
 .dice-stage.cup-cell { min-height: 200px; align-items: stretch; perspective: none; }
 /* 吹牛骰 solo:只顯示自己骰子 → 把骰盅區域調高;用固定 height 讓骰子確實貼齊底部(同 demo) */
 #board.solo .dice-stage.cup-cell { height: 280px; min-height: 0; }
-.cell-info { margin-top: 8px; }
+.cell-info { margin-top: 8px; font-size: 1.6rem; }
 .pip-stat { display: inline-block; margin: 0 5px; white-space: nowrap; }
 .pip-stat b { font-size: 1.15em; font-weight: 400; }
 /* 純搖骰:總和做成藥丸標籤;領先者再加金色 */
@@ -708,7 +708,7 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
 @media (max-width: 600px) and (orientation: portrait) {
   .board-cell { padding: 8px 5px; }
   .cell-name { margin-bottom: 4px; font-size: .85rem; }
-  .cell-info { margin-top: 4px; font-size: .85rem; }
+  .cell-info { margin-top: 4px; font-size: 1.4rem; }
   .dice-stage { min-height: 54px; gap: 6px; }
   .dice-stage.cup-cell { min-height: 200px; }
   #board.solo .dice-stage.cup-cell { height: 345px; min-height: 0; }

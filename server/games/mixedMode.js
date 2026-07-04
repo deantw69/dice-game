@@ -322,9 +322,19 @@ function resolvePoker(round, match) {
   for (const id of round.order) {
     if (minArr === null || cmpHand(evals[id].arr, minArr) < 0) minArr = evals[id].arr;
   }
-  const lowestIds = round.order.filter((id) => cmpHand(evals[id].arr, minArr) === 0);
+  let lowestIds = round.order.filter((id) => cmpHand(evals[id].arr, minArr) === 0);
   const ranks = {};
   for (const id of round.order) ranks[id] = evals[id].label;
+
+  // 平手只留一人:重骰者骰成同大 → 重骰者繼續;開局同大 → 順位最前者
+  if (lowestIds.length > 1) {
+    const lastRoller = round.reveal && round.reveal.lastRoll && round.reveal.lastRoll.id;
+    if (lastRoller && lowestIds.includes(lastRoller)) {
+      lowestIds = [lastRoller];
+    } else {
+      lowestIds = [lowestIds[0]];
+    }
+  }
 
   // 重骰次數:剛「進入最小」的玩家補滿(換人又換回來會重置);續留最小者沿用剩餘
   const prevLowest = (round.reveal && round.reveal.lowestIds) || [];

@@ -1,7 +1,7 @@
 // 21 點骰:輪流要牌(擲骰),點數加總盡量接近 21 但不能爆;暗骰對他人隱藏
 import { rollDie } from '../util/rng.js';
 
-const DEFAULT_LIVES = 3;
+const DEFAULT_LIVES = 0;
 
 export const blackjack21 = {
   id: 'blackjack21',

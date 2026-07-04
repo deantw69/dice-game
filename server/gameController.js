@@ -57,8 +57,8 @@ export function startRound(room, playerId) {
   if (mode.id === 'roulette' || mode.id === 'blackjack21') {
     if (!room.match || room.matchOver) {
       const opts = mode.id === 'roulette'
-        ? { lives: room.rouletteLives ?? 3, abilityPoints: room.rouletteAbility ?? 2 }
-        : { lives: room.blackjackLives ?? 3 };
+        ? { lives: room.rouletteLives ?? 0, abilityPoints: room.rouletteAbility ?? 2 }
+        : { lives: room.blackjackLives ?? 0 };
       room.match = mode.initMatch(room.players, opts);
       room.matchOver = false;
       room.winnerId = null;
@@ -75,10 +75,15 @@ export function startRound(room, playerId) {
     room.winnerId = null;
     room.round = mode.startRound(room.match, room.players);
   } else if (mode.id === 'speed') {
-    // 手速骰每局獨立(單局制,不存累計)→ 每次用當前秒數重建,計時器由 index.js 排程
-    room.match = mode.initMatch(room.players, { seconds: room.speedSeconds ?? 30 });
-    room.matchOver = false;
-    room.winnerId = null;
+    if (!room.match || room.matchOver) {
+      room.match = mode.initMatch(room.players, { seconds: room.speedSeconds ?? 30, lives: room.speedLives ?? 0 });
+      room.matchOver = false;
+      room.winnerId = null;
+    } else {
+      for (const p of room.players) {
+        if (room.match.lives[p.id] == null) room.match.lives[p.id] = room.match.startLives;
+      }
+    }
     room.round = mode.startRound(room.match, room.players, Date.now());
   } else if (isMatchMode(mode)) {
     // 混合模式:整場狀態持續(會淘汰失骰),固定從 5 顆開始
@@ -139,7 +144,7 @@ export function handleAction(room, player, action) {
         room.matchOver = true;
         const w = mode.winner(room.match, room.players);
         room.winnerId = w ? w.id : null;
-        if (mode.id !== 'liars' && mode.id !== 'roulette' && mode.id !== 'blackjack21') recordLosses(room);
+        if (mode.id !== 'liars' && mode.id !== 'roulette' && mode.id !== 'blackjack21' && mode.id !== 'speed') recordLosses(room);
       }
       room.status = 'lobby'; // 等房主開下一輪 / 或整場已結束
     }
@@ -152,19 +157,19 @@ export function handleAction(room, player, action) {
 export function speedReveal(room) {
   if (room.modeId !== 'speed' || !room.round) return;
   MODES.speed.reveal(room.round, Date.now());
-  if (room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
+  if (room.round.phase === 'roundEnd') { recordRoundLosers(room); finishIfMatchOver(room, MODES.speed); room.status = 'lobby'; }
 }
 export function speedConfirmAchieve(room, playerId, rollSeq, speedId) {
   if (room.modeId !== 'speed' || !room.round) return false;
   if (room.round.speedId !== speedId) return false;
-  const changed = MODES.speed.confirmAchieve(room.round, playerId, rollSeq);
-  if (changed && room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
+  const changed = MODES.speed.confirmAchieve(room.round, room.match, playerId, rollSeq);
+  if (changed && room.round.phase === 'roundEnd') { recordRoundLosers(room); finishIfMatchOver(room, MODES.speed); room.status = 'lobby'; }
   return changed;
 }
 export function speedTimeout(room) {
   if (room.modeId !== 'speed' || !room.round) return;
-  MODES.speed.resolveTimeout(room.round);
-  if (room.round.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
+  MODES.speed.resolveTimeout(room.round, room.match);
+  if (room.round.phase === 'roundEnd') { recordRoundLosers(room); finishIfMatchOver(room, MODES.speed); room.status = 'lobby'; }
 }
 
 // 驚爆骰:安全區自動骰(由 index.js 計時器逐步驅動)
@@ -325,11 +330,10 @@ export function onPlayerLeft(room, leftId) {
       const r = room.round;
       if (mode.prune(r, leftId)) {
         if (r.order.length <= 1) {
-          room.status = 'lobby'; // 全走光或只剩 1 人 → 本局作廢回大廳(不判輸)
+          room.status = 'lobby';
         } else if (r.phase === 'racing') {
-          // 離開者可能讓「剩 1 人未達標」成立 → 重判提前結束
-          mode.checkEarlyEnd(r);
-          if (r.phase === 'roundEnd') { recordRoundLosers(room); room.status = 'lobby'; }
+          mode.checkEarlyEnd(r, room.match);
+          if (r.phase === 'roundEnd') { recordRoundLosers(room); finishIfMatchOver(room, mode); room.status = 'lobby'; }
         }
       }
     }

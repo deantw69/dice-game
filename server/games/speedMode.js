@@ -3,7 +3,7 @@
 //       揭題後不自動發骰,玩家自己按「搖骰」開始;搶先湊出「剛好指定撲克牌型」即達標安全。
 // 輸家判定:當只剩 1 人未達標(N-1 人達標)→ 立刻結束、該人輸;
 //           時間到仍有 ≥2 人未達標 → 未達標者全部輸。
-// 單局制:無生命、無淘汰、無最終勝利者(每局選出輸家即回大廳,類比吹牛骰)。
+// 淘汰制:生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。最後存活者為最終勝利者。
 import { randomInt } from 'node:crypto';
 import { rollDice } from '../util/rng.js';
 import { evalHand } from '../util/pokerHand.js';
@@ -28,13 +28,24 @@ export const speedMode = {
   minPlayers: 2,
   startSeconds: DEFAULT_SECONDS,
 
-  // 單局制:不存累計,只記本局秒數
-  initMatch(players, { seconds = DEFAULT_SECONDS } = {}) {
-    return { seconds: clampSeconds(seconds) };
+  initMatch(players, { seconds = DEFAULT_SECONDS, lives = 0 } = {}) {
+    const l = {};
+    for (const p of players) l[p.id] = lives;
+    return {
+      seconds: clampSeconds(seconds),
+      lives: l,
+      eliminated: [],
+      startLives: lives,
+    };
   },
 
   startRound(match, players, now) {
-    const order = players.map((p) => p.id);
+    const alive = match.startLives === 0
+      ? players
+      : players.filter(
+          (p) => (match.lives[p.id] || 0) > 0 && !match.eliminated.includes(p.id),
+        );
+    const order = alive.map((p) => p.id);
     const targetRank = TARGET_POOL[randomInt(0, TARGET_POOL.length)];
     return {
       phase: 'countdown',             // countdown -> racing -> roundEnd
@@ -100,20 +111,23 @@ export const speedMode = {
   },
 
   // N-1 人達標 → 只剩 1 人未達標即立刻結束、該人輸(不等截止)
-  checkEarlyEnd(round) {
+  checkEarlyEnd(round, match) {
     if (round.phase !== 'racing' || round.order.length < 2) return;
     const remaining = round.order.filter((id) => !round.done.includes(id));
     if (remaining.length <= 1) {
       round.reveal = { losers: remaining };
       round.phase = 'roundEnd';
+      if (match) deductLives(match, remaining);
     }
   },
 
   // T2:時間到,未達標者全部判輸
-  resolveTimeout(round) {
+  resolveTimeout(round, match) {
     if (round.phase !== 'racing') return;
-    round.reveal = { losers: round.order.filter((id) => !round.done.includes(id)) };
+    const losers = round.order.filter((id) => !round.done.includes(id));
+    round.reveal = { losers };
     round.phase = 'roundEnd';
+    if (match) deductLives(match, losers);
   },
 
   // 玩家離開:清掉其在本局的所有痕跡;回傳此人原本是否在局內
@@ -132,17 +146,17 @@ export const speedMode = {
   isRoundOver(round) {
     return round.phase === 'roundEnd';
   },
-  // 單局制(類比吹牛骰):每局結束即回大廳,無整場勝者概念。
-  // 回 false 讓 matchOver 維持關閉(避免 recordLosses 重複累計、避免彈最終勝利者),
-  // 回大廳由 gameController 在 roundEnd 無條件設定。
-  isMatchOver() {
-    return false;
+  isMatchOver(match, players) {
+    if (match.startLives === 0) return true;
+    return players.filter((p) => (match.lives[p.id] || 0) > 0).length <= 1;
   },
-  winner() {
-    return null;
+  winner(match, players) {
+    if (match.startLives === 0) return null;
+    const alive = players.filter((p) => (match.lives[p.id] || 0) > 0);
+    return alive.length === 1 ? alive[0] : null;
   },
 
-  publicView(round, _match, _players) {
+  publicView(round, match, _players) {
     const racing = round.phase !== 'countdown'; // 倒數時不洩題、不發骰
     return {
       phase: round.phase,
@@ -159,6 +173,8 @@ export const speedMode = {
       targetAt: round.targetAt,
       deadlineAt: round.deadlineAt,
       serverNow: Date.now(),
+      lives: match.lives,
+      eliminated: match.eliminated,
     };
   },
   // 本模式無隱藏資訊,myDice/myLocked 只是方便前端取用
@@ -169,13 +185,12 @@ export const speedMode = {
     };
   },
   // 延遲達標確認:由 index.js 在 ACHIEVE_DELAY_MS 後呼叫
-  confirmAchieve(round, playerId, rollSeq) {
-    // 只在 racing 階段確認;若 timeout 已先觸發(roundEnd)就不再補達標
+  confirmAchieve(round, match, playerId, rollSeq) {
     if (round.phase !== 'racing') return false;
     if (round.done.includes(playerId)) return false;
     if ((round.rolls[playerId] || 0) !== rollSeq) return false;
     markDone(round, playerId, Date.now());
-    this.checkEarlyEnd(round);
+    this.checkEarlyEnd(round, match);
     return true;
   },
 
@@ -187,6 +202,16 @@ function markDone(round, id, now) {
   round.done.push(id);
   round.doneAt[id] = now;
   delete round.locked[id];
+}
+
+function deductLives(match, losers) {
+  if (match.startLives <= 0) return;
+  for (const id of losers) {
+    match.lives[id] = Math.max(0, (match.lives[id] || 0) - 1);
+    if (match.lives[id] <= 0 && !match.eliminated.includes(id)) {
+      match.eliminated.push(id);
+    }
+  }
 }
 
 function clampSeconds(s) {

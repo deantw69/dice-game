@@ -600,7 +600,7 @@ const MODE_RULES = {
     <p>即時競速模式,每人 5 顆骰。倒數 3 秒後揭題,指定一個<b>撲克牌型</b>(須剛好湊到該牌型,不是「以上」)。</p>
     <p>揭題後各自按「搖骰」開始,可無限重骰、各自獨立鎖骰。連續擲骰有 1 秒冷卻。</p>
     <p>搶先湊到指定牌型即<b>安全</b>。只剩 1 人未達標就立刻結束、該人輸;時間到仍有 2 人以上未達標,則未達標者全輸。</p>
-    <p class="muted">為單局制(每局結束回大廳,無最終勝利者)。秒數由房主設定(預設 30,範圍 10~60)。</p>
+    <p class="muted">生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。最後存活者為最終勝利者。秒數預設 30,範圍 10~60。</p>
   </div>`,
 };
 let modeInfoOpen = false;
@@ -775,7 +775,9 @@ function renderLobby() {
   if (state.modeId === 'speed') {
     html += `<div class="lobby-row"><span class="label">每局秒數</span>
       <input id="speedSeconds" type="number" min="10" max="60" value="${state.speedSeconds}" /></div>`;
-    html += `<div class="lobby-row hint">倒數 3 秒揭題,搶先湊出指定牌型;最後一個沒湊到的人輸</div>`;
+    html += `<div class="lobby-row"><span class="label">每人生命</span>
+      <input id="speedLives" type="number" min="0" max="10" value="${state.speedLives}" /></div>`;
+    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
   }
   if (state.modeId === 'mixed') {
     html += `<div class="lobby-row"><label class="auto-next">
@@ -795,6 +797,7 @@ function renderLobby() {
   if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
   $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
   $('speedSeconds')?.addEventListener('change', (e) => act('setSpeedSeconds', { value: e.target.value }));
+  $('speedLives')?.addEventListener('change', (e) => act('setSpeedLives', { value: e.target.value }));
   $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
   $('rouletteAbility')?.addEventListener('change', (e) => act('setRouletteAbility', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
@@ -836,7 +839,7 @@ function maybeAutoNext() {
 function startButtonLabel() {
   if (state.modeId === 'liars' || state.modeId === 'mixed' || state.modeId === 'roulette' || state.modeId === 'speed') {
     if (state.matchOver) return '再來一場';
-    if (state.game) return state.modeId === 'speed' ? '下一局' : '下一輪';
+    if (state.game) return '下一局';
     return '開始遊戲';
   }
   if (state.modeId === 'roll') return state.game ? '再搖一輪' : '開始搖骰';
@@ -1277,7 +1280,12 @@ function renderBoard() {
       const ended = g.phase === 'roundEnd';
       const isLoser = ended && g.reveal && (g.reveal.losers || []).includes(p.id);
       cell.classList.toggle('done-safe', isDone && !ended && !(p.id === myId && speedRolling));
-      cell.classList.toggle('eliminated', isLoser);
+      const singleRound = state.speedLives === 0;
+      const lives = (g.lives && g.lives[p.id]) || 0;
+      const hearts = singleRound ? '' : (lives > 0 ? '❤️'.repeat(lives) : '💀');
+      cell.querySelector('.cell-name').innerHTML =
+        (p.id === state.hostId ? '👑 ' : '') + esc(p.name) + (p.id === myId ? ' (你)' : '') + (hearts ? ` <span class="roulette-lives">${hearts}</span>` : '');
+      cell.classList.toggle('eliminated', isLoser || (!singleRound && lives <= 0));
 
       if (g.phase === 'countdown') {
         stage.innerHTML = '<div class="waiting">準備…</div>';

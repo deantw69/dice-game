@@ -19,7 +19,7 @@ export const russianRoulette = {
   name: '驚爆骰',
   minPlayers: 2,
 
-  initMatch(players, { lives = 3, abilityPoints = 2 } = {}) {
+  initMatch(players, { lives = 0, abilityPoints = 2 } = {}) {
     const l = {};
     for (const p of players) l[p.id] = lives;
     return {

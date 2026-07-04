@@ -175,6 +175,83 @@ export function playExplosion() {
   sub.stop(t0 + 0.6);
 }
 
+// 鐵支:金屬鏗鏘重擊(短促金屬撞擊 + 下行餘韻)
+export function playIronFour() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return;
+  const ac = ctx();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  const note = (when, freq, dur, vol = 0.25, type = 'square') => {
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g).connect(ac.destination);
+    o.start(when);
+    o.stop(when + dur + 0.02);
+  };
+  // 金屬撞擊:高頻三連擊
+  note(t0, 1200, 0.08, 0.3, 'square');
+  note(t0 + 0.08, 1600, 0.06, 0.25, 'square');
+  note(t0 + 0.15, 2400, 0.12, 0.35, 'sawtooth');
+  // 餘韻:下行泛音
+  note(t0 + 0.28, 880, 0.3, 0.15, 'triangle');
+  note(t0 + 0.30, 660, 0.35, 0.12, 'sine');
+}
+
+// 豹子:史詩號角(上行大和弦 + 顫音高潮 + 低音震撼)
+export function playLeopard() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return;
+  const ac = ctx();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  const note = (when, freq, dur, vol = 0.22, type = 'square') => {
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g).connect(ac.destination);
+    o.start(when);
+    o.stop(when + dur + 0.02);
+  };
+  // 低音鼓點震撼
+  const sub = ac.createOscillator();
+  const sg = ac.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(100, t0);
+  sub.frequency.exponentialRampToValueAtTime(40, t0 + 0.4);
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(0.5, t0 + 0.01);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+  sub.connect(sg).connect(ac.destination);
+  sub.start(t0); sub.stop(t0 + 0.5);
+  // 上行大和弦琶音(C-E-G-C)+ 和聲
+  const arp = [
+    [0.05, 523.25, 0.15],  // C5
+    [0.18, 659.25, 0.15],  // E5
+    [0.30, 783.99, 0.15],  // G5
+    [0.44, 1046.50, 0.20], // C6
+  ];
+  arp.forEach(([w, f, d]) => {
+    note(t0 + w, f, d, 0.25);
+    note(t0 + w, f * 1.5, d, 0.1, 'triangle'); // 高五度泛音
+  });
+  // 高潮顫音
+  for (let i = 0; i < 6; i++) {
+    note(t0 + 0.68 + i * 0.06, i % 2 ? 2093 : 1567.98, 0.06, 0.2);
+  }
+  // 結尾大和弦
+  note(t0 + 1.08, 1046.50, 0.45, 0.2, 'triangle');
+  note(t0 + 1.08, 1567.98, 0.45, 0.18);
+  note(t0 + 1.08, 2093.00, 0.4, 0.15, 'sawtooth');
+}
+
 // 在 durationMs 內連續播放喀啦聲(模擬骰子在盅內碰撞)
 let lastPlay = -1;
 export function playRattle(durationMs = 950) {

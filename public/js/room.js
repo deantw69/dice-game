@@ -2,7 +2,7 @@
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
 import { createRenderer as createCup } from './dice/diceCup.js';
-import { playAlert, playFanfare, playRattle, playVictory, playExplosion, playCountdownTick } from './dice/cupSound.js';
+import { playAlert, playFanfare, playRattle, playVictory, playExplosion, playCountdownTick, playIronFour, playLeopard } from './dice/cupSound.js';
 import { makeQrMatrix } from './vendor/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
@@ -57,6 +57,7 @@ let lastMilestoneKey = '';    // 嘲諷里程碑 popup 簽章
 let milestoneDismissed = '';  // 已被點掉的里程碑
 let milestoneTimer = null;    // 里程碑延遲顯示計時器
 let lobbyExpanded = false;    // 房主:一局結束後 lobby 預設精簡(只剩「再來一場/換模式」),按「換模式」才展開
+let lastHandFxKey = '';       // 話胚:上次播放的鐵支/豹子特效簽章(避免重複播放)
 
 // ---- 連線 / 重連 ----
 async function doRejoin() {
@@ -371,6 +372,48 @@ function playBombFx() {
     + `<div class="bomb-core">💥</div>${parts}`;
   el.style.display = 'flex';
   setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1000);
+}
+
+// 鐵支特效:金色衝擊波 + 星芒四射 + 中央「鐵支」大字
+function playIronFx() {
+  const el = $('handFx');
+  if (!el) return;
+  const stars = ['⭐', '✨', '💫', '🌟', '⭐', '✨'];
+  const parts = stars.map((emo, i) => {
+    const ang = (Math.PI * 2 * i) / stars.length + (i % 2 ? 0.25 : -0.25);
+    const dist = 120 + (i % 3) * 60;
+    const dx = Math.round(Math.cos(ang) * dist);
+    const dy = Math.round(Math.sin(ang) * dist);
+    return `<div class="iron-star" style="--dx:${dx}px;--dy:${dy}px">${emo}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="iron-flash"></div><div class="iron-ring"></div>`
+    + `<div class="iron-label">🔩 鐵支</div>${parts}`;
+  el.style.display = 'flex';
+  playIronFour();
+  setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1300);
+}
+
+// 豹子特效:彩虹漩渦 + 爆發粒子 + 中央豹子名稱
+function playLeopardFx(label) {
+  const el = $('handFx');
+  if (!el) return;
+  const emojis = ['🎯', '🔥', '💎', '👑', '🎯', '🔥', '💎', '👑', '⚡', '🌈'];
+  const parts = emojis.map((emo, i) => {
+    const ang = (Math.PI * 2 * i) / emojis.length + (i % 2 ? 0.2 : -0.2);
+    const dist = 140 + (i % 3) * 55;
+    const dx = Math.round(Math.cos(ang) * dist);
+    const dy = Math.round(Math.sin(ang) * dist);
+    const rot = (i % 2 ? 1 : -1) * (120 + i * 35);
+    return `<div class="pao-burst" style="--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg">${emo}</div>`;
+  }).join('');
+  const colors = ['#f44', '#ff0', '#0f0', '#0ff', '#f0f'];
+  const ring1 = `<div class="pao-ring" style="border-color:${colors[0]};animation-delay:0s"></div>`;
+  const ring2 = `<div class="pao-ring" style="border-color:${colors[2]};animation-delay:.15s"></div>`;
+  el.innerHTML = `<div class="pao-vortex"></div><div class="pao-flash"></div>`
+    + `${ring1}${ring2}<div class="pao-label">🐆 ${label}</div>${parts}`;
+  el.style.display = 'flex';
+  playLeopard();
+  setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1600);
 }
 
 // 淘汰制最終勝利者 popup:matchOver + winnerId 時延遲彈出(讓輸家 popup 先顯示)
@@ -1321,6 +1364,26 @@ function renderBoard() {
         info.textContent = '';
       }
     }
+  }
+
+  // 話胚開牌:偵測鐵支/豹子 → 播特效(初次開牌或重骰結果改變時各播一次)
+  if (pokerReveal && g.reveal.ranks && !pokerRerollAnim) {
+    let bestRank = '';
+    let bestLabel = '';
+    for (const id of Object.keys(g.reveal.ranks)) {
+      const r = g.reveal.ranks[id];
+      if (r && r.endsWith('豹子')) { bestRank = 'leopard'; bestLabel = r; break; }
+      if (r === '鐵支' && bestRank !== 'leopard') { bestRank = 'iron'; bestLabel = r; }
+    }
+    const fxKey = bestRank + ':' + JSON.stringify(g.reveal.ranks);
+    if (bestRank && fxKey !== lastHandFxKey) {
+      lastHandFxKey = fxKey;
+      if (bestRank === 'leopard') playLeopardFx(bestLabel);
+      else playIronFx();
+    }
+    if (!bestRank) lastHandFxKey = '';
+  } else if (!pokerReveal) {
+    lastHandFxKey = '';
   }
 
   // 初次靜態開牌完成後,後續話胚點數變動(重骰)就改用滾動;離開話胚則重置

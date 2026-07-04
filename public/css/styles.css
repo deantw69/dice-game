@@ -674,6 +674,10 @@ button.danger:hover { filter: brightness(1.08); }
 .dot.on { background: var(--success); }
 .dot.off { background: var(--offline); }
 .bid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bj-hit-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 8px; }
+.bj-hit-row::before { content: '要牌顆數'; font-size: var(--fs-sm); color: var(--muted); margin-right: 4px; }
+.bj-hit-n { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border); background: var(--input-bg); color: var(--text); font-size: var(--fs-lg); font-weight: 700; cursor: pointer; transition: all .15s; }
+.bj-hit-n.selected { border-color: var(--accent); background: var(--accent); color: #fff; }
 /* 等待訊息中的玩家名稱highlight */
 .hl { color: var(--accent); font-weight: 700; }
 .auto-next, .auto-roll { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }

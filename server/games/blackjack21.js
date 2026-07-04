@@ -51,9 +51,14 @@ export const blackjack21 = {
     const hand = round.hands[player.id];
 
     if (action.type === 'hit' || action.type === 'roll') {
-      const value = rollDie();
-      hand.dice.push(value);
-      hand.total += value;
+      const count = Math.max(1, Math.min(3, Math.floor(Number(action.count) || 1)));
+      const rolled = [];
+      for (let i = 0; i < count; i++) {
+        const value = rollDie();
+        hand.dice.push(value);
+        hand.total += value;
+        rolled.push(value);
+      }
       if (hand.total > 21) {
         hand.bust = true;
         hand.stood = true;
@@ -61,7 +66,7 @@ export const blackjack21 = {
       round.actionSeq = (round.actionSeq || 0) + 1;
       advanceTurn(round);
       checkAllDone(round, match);
-      return { ok: true, rolled: value };
+      return { ok: true, rolled };
     }
 
     if (action.type === 'stand') {

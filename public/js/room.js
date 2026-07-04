@@ -547,7 +547,7 @@ const MODE_RULES = {
   blackjack21: `<div class="rank-card">
     <h3>🎲 21 點骰</h3>
     <p>輪流行動的<b>淘汰制</b>遊戲,目標是讓骰子點數總和<b>接近但不超過 21</b>。</p>
-    <p>開局自動骰 3 顆起手,之後輪到你時可「要骰」(再骰一顆)或「停牌」。</p>
+    <p>開局自動骰 3 顆起手,之後輪到你時可選擇<b>要 1~3 顆</b>骰或「停牌」。</p>
     <p><b>暗骰</b>:別人只看得到你骰了幾顆、看不到點數;爆掉的外觀和停牌一樣(可虛張聲勢)。</p>
     <p>全員結束後開牌:爆掉者輸;全沒爆則最低分者輸(同分時骰子數多者贏);全爆則超過最多者輸。</p>
     <p class="muted">生命數由房主設定(預設 3);設為 0 為單局模式、不淘汰。最後存活者為最終勝利者。</p>
@@ -1398,9 +1398,14 @@ function renderControls() {
       const curId = (g.order || [])[g.turnIndex];
       if (curId === myId) {
         el.innerHTML = '<div class="bid-row">'
-          + rollBtn('🎲 要牌')
+          + [1, 2, 3].map(n =>
+            `<button class="bj-hit" data-n="${n}">🎲 要${n}顆</button>`
+          ).join('')
           + '<button id="bjStand" class="secondary">✋ 停牌</button>'
           + '</div>';
+        el.querySelectorAll('.bj-hit').forEach(b => b.addEventListener('click', () => {
+          act('action', { type: 'roll', count: Number(b.dataset.n) });
+        }));
         $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
       } else {
         const nm = state.players.find((x) => x.id === curId);
@@ -1561,13 +1566,16 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+// ---- 21 點骰:玩家選擇要牌顆數 ----
+let bjHitCount = 1;
+
 // ---- 按住搖骰:按住時骰子一直轉,放開才送出搖骰並停在結果 ----
 const rollSpin = { active: false, committing: false, timer: null, seqAtPress: -1 };
 function rollDiceCount() {
   const g = state && state.game; if (!g) return 0;
   if (g.mode === 'roll') return g.diceCount || 3;
   if (g.mode === 'roulette') return 1;
-  if (g.mode === 'blackjack21') return 1;
+  if (g.mode === 'blackjack21') return bjHitCount || 1;
   return (g.diceLeft && g.diceLeft[myId]) || 0;
 }
 function myRollRegistered() {
@@ -1638,7 +1646,9 @@ function releaseRoll() {
   rollSpin.committing = true;
   const isReroll = rollSpin.kind === 'reroll';
   if (isReroll ? !canRerollNow() : !canRollNow()) { stopRollSpin(); render(); return; }
-  emit('action', { type: isReroll ? 'reroll' : 'roll' }).then((res) => {
+  const actionPayload = { type: isReroll ? 'reroll' : 'roll' };
+  if (state?.game?.mode === 'blackjack21') actionPayload.count = bjHitCount || 1;
+  emit('action', actionPayload).then((res) => {
     if (res && res.error) { toast(res.error); stopRollSpin(); render(); }
     // 成功 → 等 roomState 廣播,在 renderBoard 收尾停住
   });

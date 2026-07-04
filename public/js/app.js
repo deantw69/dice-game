@@ -123,6 +123,21 @@ function renderRoomList(rooms) {
 emit('listRooms').then((res) => renderRoomList(res.rooms));
 socket.on('roomListUpdate', (rooms) => renderRoomList(rooms));
 
+// 誤觸返回鍵:偵測 session 仍有效 → 顯示「回到房間」橫幅
+const activeSession = JSON.parse(localStorage.getItem('dice.session') || 'null');
+if (activeSession && activeSession.code && activeSession.playerId) {
+  const bar = document.createElement('div');
+  bar.className = 'rejoin-bar';
+  bar.innerHTML = `<span>你還在房間 <strong>${activeSession.code}</strong> 中</span><button id="rejoinBtn" class="mini">回到房間</button><button id="rejoinDismiss" class="mini secondary">留在首頁</button>`;
+  document.body.prepend(bar);
+  $('rejoinBtn').addEventListener('click', () => {
+    location.href = `/room.html?code=${encodeURIComponent(activeSession.code)}`;
+  });
+  $('rejoinDismiss').addEventListener('click', () => {
+    bar.remove();
+  });
+}
+
 // 顯示版本號(git commit 短碼),方便辨認線上部署版本
 fetch('/version')
   .then((r) => r.json())

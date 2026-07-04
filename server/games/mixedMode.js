@@ -383,6 +383,11 @@ function resolveRedBlack(round, match, condId, cond) {
   }
   const losers = round.order.filter((id) => (match.diceLeft[id] || 0) === 0);
   const aliveCount = round.order.filter((id) => (match.diceLeft[id] || 0) > 0).length;
+  // 秒殺:第一次選就被一次拿光所有骰子(removed 等於該手骰子數 = 全滅)
+  const instantKill = losers.filter((id) => {
+    const hand = round.hands[id] || [];
+    return hand.length > 0 && removed[id] === hand.length && hand.length >= (match.startDice || 5);
+  });
   round.condition = condId;
   // 有人歸零(或只剩一人)→ 整場結束;否則進入 reveal 等玩家搖下一骰
   round.phase = (losers.length > 0 || aliveCount <= 1) ? 'roundEnd' : 'reveal';
@@ -394,6 +399,7 @@ function resolveRedBlack(round, match, condId, cond) {
     removed,            // 每人被拿掉幾顆
     removedIdx,         // 每人被拿掉的骰子索引(前端畫叉用)
     losers,             // 失去所有骰子者(輸)
+    instantKill,        // 秒殺:第一次選就全拿光的玩家
     pending: false,
   };
   if (round.phase === 'reveal') {

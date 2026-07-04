@@ -2,7 +2,7 @@
 import { socket, emit, loadSession, clearSession } from './net.js';
 import { createRenderer as createDice } from './dice/diceCss3d.js';
 import { createRenderer as createCup } from './dice/diceCup.js';
-import { playAlert, playFanfare, playRattle, playVictory, playExplosion, playCountdownTick, playIronFour, playLeopard } from './dice/cupSound.js';
+import { playAlert, playFanfare, playRattle, playVictory, playExplosion, playCountdownTick, playIronFour, playLeopard, playInstantKill } from './dice/cupSound.js';
 import { makeQrMatrix } from './vendor/qrcode.js';
 
 const $ = (id) => document.getElementById(id);
@@ -346,8 +346,10 @@ function renderLoserBanner() {
     + `<div class="loser-name">${names}</div>${reason}`
     + `</div>`;
   el.style.display = 'flex';
-  // 驚爆骰爆掉 → 播炸彈爆炸特效 + 爆炸音效;其餘模式維持嘲諷小號
-  if (state.game && state.game.mode === 'roulette') {
+  // 紅黑單雙秒殺 → 秒殺特效;驚爆骰爆掉 → 炸彈特效;其餘 → 嘲諷小號
+  if (rv && rv.subGame === 'redblack' && rv.instantKill && rv.instantKill.length) {
+    playInstantKillFx();
+  } else if (state.game && state.game.mode === 'roulette') {
     playBombFx();
     playExplosion();
   } else {
@@ -372,6 +374,26 @@ function playBombFx() {
     + `<div class="bomb-core">💥</div>${parts}`;
   el.style.display = 'flex';
   setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1000);
+}
+
+// 秒殺特效:暗紅衝擊波 + 刀痕斬擊 + 中央「秒殺」大字 + 骷髏碎片
+function playInstantKillFx() {
+  const el = $('instantKillFx');
+  if (!el) return;
+  const skulls = ['💀', '⚡', '🗡️', '☠️', '💀', '⚡', '🗡️', '☠️', '🔥', '💢'];
+  const parts = skulls.map((emo, i) => {
+    const ang = (Math.PI * 2 * i) / skulls.length + (i % 2 ? 0.2 : -0.2);
+    const dist = 150 + (i % 3) * 60;
+    const dx = Math.round(Math.cos(ang) * dist);
+    const dy = Math.round(Math.sin(ang) * dist);
+    const rot = (i % 2 ? 1 : -1) * (150 + i * 35);
+    return `<div class="ik-shard" style="--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg">${emo}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="ik-flash"></div><div class="ik-ring"></div><div class="ik-ring ik-ring2"></div>`
+    + `<div class="ik-slash"></div><div class="ik-label">⚡ 秒殺 ⚡</div>${parts}`;
+  el.style.display = 'flex';
+  playInstantKill();
+  setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1800);
 }
 
 // 鐵支特效:金色衝擊波 + 星芒四射 + 中央「鐵支」大字

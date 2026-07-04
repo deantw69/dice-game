@@ -252,6 +252,57 @@ export function playLeopard() {
   note(t0 + 1.08, 2093.00, 0.4, 0.15, 'sawtooth');
 }
 
+// 秒殺:衝擊低音 + 刀刃斬擊 + 不祥下行音階
+export function playInstantKill() {
+  if (typeof window !== 'undefined' && window.__cupMuted) return;
+  const ac = ctx();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  const note = (when, freq, dur, vol = 0.22, type = 'square') => {
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(g).connect(ac.destination);
+    o.start(when);
+    o.stop(when + dur + 0.02);
+  };
+  // 衝擊低音
+  const sub = ac.createOscillator();
+  const sg = ac.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(120, t0);
+  sub.frequency.exponentialRampToValueAtTime(30, t0 + 0.5);
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(0.6, t0 + 0.01);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+  sub.connect(sg).connect(ac.destination);
+  sub.start(t0); sub.stop(t0 + 0.6);
+  // 刀刃斬擊(白噪音脈衝)
+  const buf = ac.createBuffer(1, ac.sampleRate * 0.15, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const ns = ac.createBufferSource();
+  const ng = ac.createGain();
+  ns.buffer = buf;
+  ng.gain.setValueAtTime(0.5, t0 + 0.05);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+  ns.connect(ng).connect(ac.destination);
+  ns.start(t0 + 0.05);
+  // 不祥下行:E5→C5→A4→F4
+  const desc = [[0.15, 659.25], [0.28, 523.25], [0.40, 440], [0.52, 349.23]];
+  desc.forEach(([w, f]) => {
+    note(t0 + w, f, 0.14, 0.28, 'sawtooth');
+    note(t0 + w, f * 0.5, 0.14, 0.12, 'triangle');
+  });
+  // 結尾低沉共鳴
+  note(t0 + 0.70, 110, 0.5, 0.2, 'triangle');
+  note(t0 + 0.70, 82.41, 0.55, 0.15, 'sine');
+}
+
 // 在 durationMs 內連續播放喀啦聲(模擬骰子在盅內碰撞)
 let lastPlay = -1;
 export function playRattle(durationMs = 950) {

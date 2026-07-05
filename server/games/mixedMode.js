@@ -9,7 +9,8 @@ import { rollDice } from '../util/rng.js';
 import { evalHand, cmpHand } from '../util/pokerHand.js';
 
 const START_DICE = 5;
-const START_REROLLS = 3; // 話胚:每人重骰次數(成為最小者時補滿)
+const IS_DEV = !process.env.RENDER_GIT_COMMIT;
+const START_REROLLS = IS_DEV ? 100 : 3;
 
 // 紅黑單雙的四個條件(紅=1與4、黑=2356、單=135、雙=246)
 const CONDITIONS = {

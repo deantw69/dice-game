@@ -1410,25 +1410,25 @@ function renderBoard() {
     }
   }
 
-  // 話胚開牌:偵測鐵支/豹子 → 播特效(初次開牌或重骰結果改變時各播一次)
+  // 話胚開牌:偵測鐵支/豹子 → 播特效(只在初次開牌或重骰者自己骰出時播一次)
   if (pokerReveal && g.reveal.ranks && !pokerRerollAnim) {
+    const rerollerId = lastRoll && lastRoll.id;
+    const isAfterReroll = !pokerInitial && !isNewRoll && rerollerId;
     let bestRank = '';
     let bestLabel = '';
     for (const id of Object.keys(g.reveal.ranks)) {
+      if (isAfterReroll && id !== rerollerId) continue;
       const r = g.reveal.ranks[id];
       if (r && r.endsWith('豹子')) { bestRank = 'leopard'; bestLabel = r; break; }
       if (r === '鐵支' && bestRank !== 'leopard') { bestRank = 'iron'; bestLabel = r; }
     }
-    const handIds = Object.entries(g.reveal.ranks)
-      .filter(([, r]) => r === '鐵支' || (r && r.endsWith('豹子')))
-      .map(([id, r]) => id + ':' + r).sort().join(',');
-    const fxKey = bestRank + ':' + handIds;
+    const fxKey = bestRank + ':' + (isAfterReroll ? rerollerId : 'init');
     if (bestRank && fxKey !== lastHandFxKey) {
       lastHandFxKey = fxKey;
       if (bestRank === 'leopard') playLeopardFx(bestLabel);
       else playIronFx();
     }
-    if (!bestRank) lastHandFxKey = '';
+    if (!bestRank && !isAfterReroll) lastHandFxKey = '';
   } else if (!pokerReveal) {
     lastHandFxKey = '';
   }

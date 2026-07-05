@@ -1555,6 +1555,7 @@ function renderControls() {
   if (g.mode === 'blackjack21' && state.status === 'playing') {
     if (g.phase === 'rolling') {
       const curId = (g.order || [])[g.turnIndex];
+      const myStood = !!(g.hands && g.hands[myId] && g.hands[myId].done);
       if (curId === myId) {
         el.innerHTML = '<div class="bid-row">'
           + [1, 2, 3].map(n =>
@@ -1565,6 +1566,14 @@ function renderControls() {
         el.querySelectorAll('.bj-hit').forEach(b => b.addEventListener('click', () => {
           act('action', { type: 'roll', count: Number(b.dataset.n) });
         }));
+        $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+      } else if (myStood) {
+        const nm = state.players.find((x) => x.id === curId);
+        el.innerHTML = `<p class="muted">你已停牌 ・ 等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`;
+      } else if ((g.order || []).includes(myId)) {
+        const nm = state.players.find((x) => x.id === curId);
+        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`
+          + '<div class="bid-row"><button id="bjStand" class="secondary">✋ 提前停牌</button></div>';
         $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
       } else {
         const nm = state.players.find((x) => x.id === curId);

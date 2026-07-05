@@ -45,10 +45,20 @@ export const blackjack21 = {
     if (!round.order.includes(player.id)) return { error: '你不在本局中' };
     if (round.phase !== 'rolling') return { error: '目前不能行動' };
 
+    const hand = round.hands[player.id];
+
+    // 停牌可在任何時機按(即使還沒輪到自己),先預先停牌;輪到時會自動被跳過
+    if (action.type === 'stand') {
+      if (hand.stood) return { error: '你已停牌' };
+      hand.stood = true;
+      round.actionSeq = (round.actionSeq || 0) + 1;
+      if (round.order[round.turnIndex] === player.id) advanceTurn(round);
+      checkAllDone(round, match);
+      return { ok: true };
+    }
+
     const currentId = round.order[round.turnIndex];
     if (player.id !== currentId) return { error: '還沒輪到你' };
-
-    const hand = round.hands[player.id];
 
     if (action.type === 'hit' || action.type === 'roll') {
       const count = Math.max(1, Math.min(3, Math.floor(Number(action.count) || 1)));
@@ -67,14 +77,6 @@ export const blackjack21 = {
       advanceTurn(round);
       checkAllDone(round, match);
       return { ok: true, rolled };
-    }
-
-    if (action.type === 'stand') {
-      hand.stood = true;
-      round.actionSeq = (round.actionSeq || 0) + 1;
-      advanceTurn(round);
-      checkAllDone(round, match);
-      return { ok: true };
     }
 
     return { error: '無效動作' };

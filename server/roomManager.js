@@ -9,6 +9,9 @@ const DISCONNECT_GRACE_MS = 30_000;
 /** @type {Map<string, object>} code -> room */
 const rooms = new Map();
 
+/** @type {Map<string, string>} socketId -> room code(查房索引;綁定/換綁 socket 時維護) */
+const socketIndex = new Map();
+
 function genCode() {
   let code;
   do {
@@ -58,6 +61,7 @@ export function createRoom(name, socketId, customCode) {
     autoRotate: false,   // 紅黑單雙:之後每骰由列表順位下一位決定條件(房主開關)
   };
   rooms.set(code, room);
+  socketIndex.set(socketId, code);
   return { room, player: host };
 }
 
@@ -68,6 +72,7 @@ export function joinRoom(code, name, socketId) {
   const uniqueName = uniqueNameInRoom(room, name);
 
   const player = makePlayer(uniqueName, socketId);
+  socketIndex.set(socketId, code);
   // 繼承離開前的輸場紀錄
   if (room.lossHistory?.[uniqueName]) {
     if (!room.losses) room.losses = {};
@@ -92,7 +97,9 @@ export function rejoin(code, playerId, socketId) {
     clearTimeout(player.disconnectTimer);
     player.disconnectTimer = null;
   }
+  if (player.socketId) socketIndex.delete(player.socketId); // 換綁前先清舊 socket 索引
   player.socketId = socketId;
+  socketIndex.set(socketId, code);
   player.connected = true;
   return { room, player };
 }
@@ -115,11 +122,29 @@ export function findPlayer(room, playerId) {
   return allMembers(room).find((p) => p.id === playerId) || null;
 }
 
-export function findRoomBySocket(socketId) {
-  for (const room of rooms.values()) {
-    if (allMembers(room).some((p) => p.socketId === socketId)) return room;
+// 以 socketId 找到房間與成員(同一次查找兩者都拿到,避免重複掃描)
+// 先查 socketIndex(O(1)),命中後驗證該房內確有此 socket 的成員(防 stale);
+// 查無或驗證失敗則 fallback 線性掃描並修正索引。
+export function findBySocket(socketId) {
+  const code = socketIndex.get(socketId);
+  if (code) {
+    const room = rooms.get(code);
+    const player = room ? allMembers(room).find((p) => p.socketId === socketId) : null;
+    if (player) return { room, player };
+    socketIndex.delete(socketId); // 索引過期,先清掉再退回線性掃描
   }
-  return null;
+  for (const room of rooms.values()) {
+    const player = allMembers(room).find((p) => p.socketId === socketId);
+    if (player) {
+      socketIndex.set(socketId, room.code); // 修正索引
+      return { room, player };
+    }
+  }
+  return { room: null, player: null };
+}
+
+export function findRoomBySocket(socketId) {
+  return findBySocket(socketId).room;
 }
 
 export function getRoom(code) {
@@ -144,10 +169,8 @@ export function getRoomList() {
 
 // socket 斷線:給予寬限期,逾時移除座位
 export function handleDisconnect(socketId, onTimeout) {
-  const room = findRoomBySocket(socketId);
-  if (!room) return null;
-  const player = allMembers(room).find((p) => p.socketId === socketId);
-  if (!player) return null;
+  const { room, player } = findBySocket(socketId);
+  if (!room || !player) return null;
   player.connected = false;
   player.disconnectTimer = setTimeout(() => {
     removePlayer(room, player.id);
@@ -163,6 +186,7 @@ export function removePlayer(room, playerId) {
     if (!room.lossHistory) room.lossHistory = {};
     room.lossHistory[member.name] = room.losses[playerId];
   }
+  if (member?.socketId) socketIndex.delete(member.socketId); // 清掉查房索引
 
   room.players = room.players.filter((p) => p.id !== playerId);
   room.spectators = room.spectators.filter((p) => p.id !== playerId);
@@ -172,8 +196,11 @@ export function removePlayer(room, playerId) {
   if (room.hostId === playerId && room.players.length > 0) {
     room.hostId = room.players[0].id;
   }
-  // 房間清空 → 刪除
+  // 房間清空 → 刪除(順帶清掉殘留成員的查房索引)
   if (room.players.length === 0 && room.spectators.length === 0 && room.away.length === 0) {
+    for (const p of allMembers(room)) {
+      if (p.socketId) socketIndex.delete(p.socketId);
+    }
     rooms.delete(room.code);
   }
 }
@@ -250,13 +277,12 @@ export function mergeSpectators(room) {
   room.spectators = [];
 }
 
-// 為特定玩家建立可見視圖(隱藏他人秘密資訊)
-export function viewFor(room, viewerId) {
+// 預先計算與 viewer 無關的視圖基底(成員名單 map、公開遊戲資訊 publicView)。
+// broadcastRoom 廣播前算一次,迴圈內重複使用,避免每位成員都重算。
+// 注意:祕密資訊(privateView)絕不能放進基底,只能在 viewFor 為該名玩家個別加上。
+export function viewBase(room) {
   const mode = room.modeId ? MODES[room.modeId] : null;
-  const isSpectator = room.spectators.some((p) => p.id === viewerId);
-  const isAway = (room.away || []).some((p) => p.id === viewerId);
-
-  const view = {
+  const shared = {
     code: room.code,
     hostId: room.hostId,
     modeId: room.modeId,
@@ -276,22 +302,34 @@ export function viewFor(room, viewerId) {
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     spectators: room.spectators.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
     away: (room.away || []).map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+  };
+
+  let pub = null;
+  if (mode && room.round) {
+    pub = typeof mode.initMatch === 'function'
+      ? mode.publicView(room.round, room.match, room.players)   // 整場狀態模式(吹牛骰 / 混合模式)
+      : mode.publicView(room.round, room.players);
+  }
+  return { shared, mode, pub };
+}
+
+// 為特定玩家建立可見視圖(隱藏他人秘密資訊)
+// base 可選:廣播時傳入預算好的 viewBase(room);不帶時(如 rejoin 單發)行為不變、自行計算。
+// 每位 viewer 的最終物件都是新物件,privateView 內容只 spread 進該玩家自己的 view.game。
+export function viewFor(room, viewerId, base) {
+  const { shared, mode, pub } = base || viewBase(room);
+  const isSpectator = room.spectators.some((p) => p.id === viewerId);
+  const isAway = (room.away || []).some((p) => p.id === viewerId);
+
+  const view = {
+    ...shared,
     you: { id: viewerId, isHost: room.hostId === viewerId, isSpectator, isAway },
     game: null,
   };
 
   if (mode && room.round) {
     const viewer = findPlayer(room, viewerId);
-    let pub;
-    let priv = {};
-    if (typeof mode.initMatch === 'function') {
-      // 整場狀態模式(吹牛骰 / 混合模式)
-      pub = mode.publicView(room.round, room.match, room.players);
-      if (viewer) priv = mode.privateView(room.round, viewer);
-    } else {
-      pub = mode.publicView(room.round, room.players);
-      if (viewer) priv = mode.privateView(room.round, viewer);
-    }
+    const priv = viewer ? mode.privateView(room.round, viewer) : {};
     view.game = { mode: mode.id, ...pub, ...priv };
   }
   return view;

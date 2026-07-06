@@ -63,6 +63,7 @@ export function createRenderer(container, options = {}) {
     // 強制 reflow:確保剛建立 / 重設的骰子會以 transition 動畫翻滾,而非瞬間跳到結果
     void container.offsetWidth;
     return new Promise((resolve) => {
+      const statics = []; // 不滾動的骰子:先全部寫入,最後只做一次 reflow(仿 setStatic 的批次寫法)
       dice.forEach((d, i) => {
         const target = SHOW_ROTATION[values[i]];
         if (!animSet || animSet.has(i)) {
@@ -76,10 +77,13 @@ export function createRenderer(container, options = {}) {
           d.die.style.transition = 'none';
           d.spins = 0;
           d.die.style.transform = `rotateX(${target.x}deg) rotateY(${target.y}deg)`;
-          void d.die.offsetWidth;
-          d.die.style.transition = '';
+          statics.push(d);
         }
       });
+      if (statics.length) {
+        void container.offsetWidth; // flush 一次,避免恢復 transition 時補動畫
+        statics.forEach((d) => { d.die.style.transition = ''; });
+      }
       // 與 CSS transition 時長一致(1.4s)
       setTimeout(resolve, 1450);
     });

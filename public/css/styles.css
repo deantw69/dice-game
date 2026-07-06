@@ -427,7 +427,7 @@ button.mini { padding: 6px 12px; font-size: .85rem; }
 }
 .room-top { position: relative; }
 .room-top.menu-open .top-actions { display: flex; }
-.menu-toggle { display: inline-flex; } /* ☰ 選單鈕:所有尺寸都顯示 */
+.menu-toggle { display: inline-flex; min-width: 44px; min-height: 44px; padding: 8px 12px; align-items: center; justify-content: center; } /* ☰ 選單鈕:所有尺寸都顯示,觸控區 ≥44x44 */
 button.danger { background: var(--danger); color: #fff; }
 button.danger:hover { filter: brightness(1.08); }
 .badge { background: var(--accent2); color: var(--on-accent2); font-weight: 700; padding: 6px 12px; border-radius: var(--r-pill); font-size: .85rem; }
@@ -471,6 +471,7 @@ button.danger:hover { filter: brightness(1.08); }
   .room-top { padding: 8px 10px; margin-bottom: 8px; gap: 8px; }
   .room-code strong { font-size: var(--fs-md); letter-spacing: 2px; }
   button.mini { padding: 5px 9px; font-size: var(--fs-xs); }
+  .menu-toggle { min-width: 44px; min-height: 44px; padding: 8px 12px; } /* 手機也要維持 ≥44x44 觸控區,避免被上面 button.mini 縮小規則蓋回去 */
   .badge { padding: 5px 10px; font-size: var(--fs-xs); }
   .banner { padding: 8px 10px; margin-bottom: 8px; }
   .panel { padding: 10px; margin-bottom: 8px; }
@@ -629,11 +630,11 @@ button.danger:hover { filter: brightness(1.08); }
 .stats-popup .stat-die-stage .f2 { transform: rotateX(90deg)  translateZ(22px); }
 .stats-popup .stat-die-stage .f5 { transform: rotateX(-90deg) translateZ(22px); }
 /* 分享房間 QR Code overlay */
-.qr-overlay { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); }
+.qr-overlay { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); overflow-y: auto; }
 .qr-box {
   position: relative; text-align: center; padding: 22px 26px 18px; border-radius: var(--r-lg);
   background: var(--panel); border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(0,0,0,0.6);
-  max-width: 92vw;
+  max-width: 92vw; max-height: 90vh; overflow-y: auto;
 }
 .qr-box .qr-close { position: absolute; top: 10px; right: 10px; }
 .qr-title { margin: 0 0 14px; font-size: 1.05rem; }
@@ -690,12 +691,12 @@ button.danger:hover { filter: brightness(1.08); }
 .roster { list-style: none; padding: 0; margin: 0 0 8px; }
 .roster li { padding: 6px 0; display: flex; align-items: center; gap: 8px; }
 .roster .pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-actions { margin-left: auto; flex-shrink: 0; display: flex; gap: 6px; }
-.kick { background: transparent; color: var(--danger-text); border: 1px solid rgba(255,138,138,0.4); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700; line-height: 1.4; }
+.row-actions { margin-left: auto; flex-shrink: 0; display: flex; gap: 10px; }
+.kick { background: transparent; color: var(--danger-text); border: 1px solid rgba(255,138,138,0.4); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700; line-height: 1.4; min-height: 30px; display: inline-flex; align-items: center; }
 .kick:hover { background: rgba(255,138,138,0.15); filter: none; }
-.mkhost { background: transparent; color: var(--accent); border: 1px solid rgba(255,204,77,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; }
+.mkhost { background: transparent; color: var(--accent); border: 1px solid rgba(255,204,77,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; min-height: 30px; display: inline-flex; align-items: center; }
 .mkhost:hover { background: rgba(255,204,77,0.15); filter: none; }
-.bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; }
+.bench { background: transparent; color: var(--accent2); border: 1px solid rgba(77,208,255,0.45); padding: 1px 8px; border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.4; min-height: 30px; display: inline-flex; align-items: center; }
 .bench:hover { background: rgba(77,208,255,0.15); filter: none; }
 .row-order { display: inline-flex; gap: 4px; margin-left: 6px; flex-shrink: 0; }
 .ord {
@@ -800,3 +801,30 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
   body.has-bottom-controls .roster-open,
   body.has-bottom-controls .roster-float { bottom: calc(var(--controls-h, 64px) + 8px); }
 }
+
+/* ===== 以下為新增規則(斷線橫幅 / 自訂確認框),僅追加、不動上方既有樣式 ===== */
+
+/* 斷線提示橫幅:固定頂部置中,深紅底白字(由 room.js 動態建立 #netBanner) */
+.net-banner {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  z-index: 95; padding: 6px 16px; border-radius: var(--r-pill);
+  background: #7a1c1c; color: #fff; font-weight: 600; font-size: var(--fs-sm);
+  border: 1px solid rgba(226,59,59,0.6); box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+  pointer-events: none; white-space: nowrap;
+}
+
+/* 自訂確認/提示框(取代原生 confirm/alert):全螢幕遮罩 + 置中深色小卡 */
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+}
+.confirm-box {
+  padding: 20px 24px 18px; border-radius: var(--r-lg);
+  background: var(--panel); border: 1px solid var(--border);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  max-width: min(92vw, 420px); text-align: center;
+}
+.confirm-msg { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
+.confirm-btns { display: flex; gap: 10px; justify-content: center; }
+.confirm-btns button { min-width: 88px; }

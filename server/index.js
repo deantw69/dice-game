@@ -22,16 +22,18 @@ app.get('/version', (_req, res) => res.json({ commit: COMMIT }));
 
 app.use(express.static(PUBLIC_DIR));
 
+// 房間列表只推給還在首頁的 socket('lobby' room:listRooms 時加入、進房後離開)
 function broadcastRoomList() {
-  io.emit('roomListUpdate', rm.getRoomList());
+  io.to('lobby').emit('roomListUpdate', rm.getRoomList());
 }
 
 // 把房間狀態(個人化視圖)推送給每位成員
 function broadcastRoom(room, { listChanged = false } = {}) {
   if (!room) return;
+  const base = rm.viewBase(room); // 與 viewer 無關的部分只算一次,迴圈內共用
   for (const p of [...room.players, ...room.spectators, ...(room.away || [])]) {
     if (p.connected && p.socketId) {
-      io.to(p.socketId).emit('roomState', rm.viewFor(room, p.id));
+      io.to(p.socketId).emit('roomState', rm.viewFor(room, p.id, base));
     }
   }
   if (listChanged) broadcastRoomList();
@@ -42,6 +44,7 @@ io.on('connection', (socket) => {
 
   socket.on('listRooms', (_payload, cb) => {
     // 前端 emit('listRooms') 經 net.js 會送出 (undefined, ack),cb 在第二位
+    socket.join('lobby'); // 訂閱房間列表更新
     cb?.({ rooms: rm.getRoomList() });
   });
 
@@ -51,6 +54,7 @@ io.on('connection', (socket) => {
     const res = rm.createRoom(name, socket.id, code);
     if (res.error) return cb?.({ error: res.error });
     const { room, player } = res;
+    socket.leave('lobby'); // 進房後不再需要房間列表更新
     socket.join(room.code);
     cb?.({ ok: true, code: room.code, playerId: player.id });
     socket.emit('modes', MODE_LIST);
@@ -63,6 +67,7 @@ io.on('connection', (socket) => {
     if (!name) return cb?.({ error: '請輸入暱稱' });
     const res = rm.joinRoom(code, name, socket.id);
     if (res.error) return cb?.({ error: res.error });
+    socket.leave('lobby');
     socket.join(code);
     cb?.({ ok: true, code, playerId: res.player.id, asSpectator: res.asSpectator });
     socket.emit('modes', MODE_LIST);
@@ -74,6 +79,7 @@ io.on('connection', (socket) => {
     code = (code || '').trim().toUpperCase();
     const res = rm.rejoin(code, playerId, socket.id);
     if (res.error) return cb?.({ error: res.error });
+    socket.leave('lobby');
     socket.join(code);
     cb?.({ ok: true, code });
     socket.emit('modes', MODE_LIST);
@@ -81,9 +87,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setMode', ({ modeId }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     const res = gc.setMode(room, me.id, modeId);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
@@ -91,9 +96,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setDiceCount', ({ count }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     const res = gc.setDiceCount(room, me.id, count);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
@@ -101,9 +105,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setRouletteLives', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.rouletteLives = Math.max(0, Math.min(10, parseInt(value) || 0));
     cb?.({ ok: true });
@@ -111,18 +114,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setRouletteBust', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     // rouletteBust 已改為每回合隨機隱藏,保留事件但不動作
     cb?.({ ok: true });
   });
 
   socket.on('setRouletteAbility', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.rouletteAbility = Math.max(0, Math.min(5, parseInt(value) || 2));
     cb?.({ ok: true });
@@ -130,9 +131,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setBlackjackLives', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.blackjackLives = Math.max(0, Math.min(10, parseInt(value) || 0));
     cb?.({ ok: true });
@@ -140,9 +140,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setSpeedSeconds', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.speedSeconds = Math.max(10, Math.min(60, parseInt(value) || 30));
     cb?.({ ok: true });
@@ -150,9 +149,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setSpeedLives', ({ value }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.speedLives = Math.max(0, Math.min(10, parseInt(value) || 0));
     cb?.({ ok: true });
@@ -160,9 +158,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setLoserDecides', ({ on }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.loserDecides = !!on;
     cb?.({ ok: true });
@@ -170,9 +167,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('shufflePlayers', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能打亂順序' });
     rm.shufflePlayers(room);
     cb?.({ ok: true });
@@ -180,9 +176,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('reversePlayers', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能顛倒順序' });
     rm.reversePlayers(room);
     cb?.({ ok: true });
@@ -191,9 +186,8 @@ io.on('connection', (socket) => {
 
   // 房主手動排序玩家(只在大廳;開局後順序已鎖進回合)
   socket.on('reorderPlayers', ({ order } = {}, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能調整順序' });
     if (room.status !== 'lobby') return cb?.({ error: '遊戲進行中無法調整順序' });
     const res = rm.reorderPlayers(room, order);
@@ -203,9 +197,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setAutoRotate', ({ on }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能設定' });
     room.autoRotate = !!on;
     cb?.({ ok: true });
@@ -213,9 +206,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('startRound', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     const res = gc.startRound(room, me.id);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
@@ -225,9 +217,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('action', (action, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me) return cb?.({ error: '找不到你的座位' });
     const prevStatus = room.status;
     const res = gc.handleAction(room, me, action || {});
@@ -245,9 +236,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leaveRoom', (_p, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id);
     if (room) {
-      const me = playerBySocket(room, socket.id);
       const leftId = me ? me.id : null;
       if (leftId) rm.removePlayer(room, leftId);
       socket.leave(room.code);
@@ -258,9 +248,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('forceReset', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     const res = gc.forceReset(room, me.id);
     if (res.error) return cb?.({ error: res.error });
     cb?.({ ok: true });
@@ -268,9 +257,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('transferHost', ({ targetId }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能指定房主' });
     if (targetId === me.id) return cb?.({ error: '你已經是房主' });
     const target = rm.findPlayer(room, targetId);
@@ -281,9 +269,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('kickPlayer', ({ targetId }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能踢人' });
     if (targetId === me.id) return cb?.({ error: '不能踢自己' });
     const target = rm.findPlayer(room, targetId);
@@ -304,9 +291,8 @@ io.on('connection', (socket) => {
 
   // 房主把(閒置)玩家丟入暫離觀戰區
   socket.on('benchPlayer', ({ targetId }, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me || room.hostId !== me.id) return cb?.({ error: '只有房主能操作' });
     if (targetId === me.id) return cb?.({ error: '不能把自己丟入暫離區' });
     const res = rm.benchPlayer(room, targetId);
@@ -318,9 +304,8 @@ io.on('connection', (socket) => {
 
   // 玩家把自己丟入暫離觀戰區(房主自己暫離會自動把房主轉給下一位)
   socket.on('benchSelf', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me) return cb?.({ error: '找不到你的座位' });
     const res = rm.benchPlayer(room, me.id); // 內部會處理房主轉移
     if (res.error) return cb?.({ error: res.error });
@@ -331,9 +316,8 @@ io.on('connection', (socket) => {
 
   // 暫離玩家按「我回來了」→ 回到 spectators(下一局加入)
   socket.on('imBack', (_payload, cb) => {
-    const room = rm.findRoomBySocket(socket.id);
+    const { room, player: me } = rm.findBySocket(socket.id); // 同一次查找拿到房間與座位
     if (!room) return cb?.({ error: '尚未加入房間' });
-    const me = playerBySocket(room, socket.id);
     if (!me) return cb?.({ error: '找不到你' });
     const res = rm.imBack(room, me.id);
     if (res.error) return cb?.({ error: res.error });
@@ -377,18 +361,20 @@ function armSpeedTimers(room) {
 }
 
 const ROULETTE_AUTO_DELAY = 400; // ms between each auto-roll step
+// 仿 armSpeedTimers 的 speedId:每次起鏈給 round.rouletteId 一個新 nonce,
+// 回呼觸發時驗證 room.round 仍是同一 rouletteId 才執行 —— 換局/重複排程留下的過期 timer 會自動失效(防重入)。
+let rouletteAutoSeq = 0;
 function armRouletteAutoRoll(room) {
   if (!gc.rouletteNeedsAutoRoll(room)) return;
+  const id = ++rouletteAutoSeq;
+  room.round.rouletteId = id;
   setTimeout(() => {
-    if (!room.round || room.status !== 'playing' || room.modeId !== 'roulette') return;
+    const r = room.round;
+    if (!r || r.rouletteId !== id || room.status !== 'playing' || room.modeId !== 'roulette') return;
     if (!gc.rouletteAutoRollOnce(room)) return;
     broadcastRoom(room);
     armRouletteAutoRoll(room);
   }, ROULETTE_AUTO_DELAY);
-}
-
-function playerBySocket(room, socketId) {
-  return [...room.players, ...room.spectators, ...(room.away || [])].find((p) => p.socketId === socketId) || null;
 }
 
 httpServer.listen(PORT, () => {

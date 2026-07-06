@@ -62,23 +62,35 @@ function go(code, playerId, name) {
   location.href = `/room.html?code=${encodeURIComponent(code)}`;
 }
 
-$('create').addEventListener('click', async () => {
-  showError('');
-  const name = ensureName();
-  const code = customCodeInput.value.trim().toUpperCase();
-  const res = await emit('createRoom', { name, code: code || undefined });
-  if (res.error) return showError(res.error);
-  go(res.code, res.playerId, name);
+$('create').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true; // 防連點:等待期間鎖住,完成(成功跳轉或失敗)後恢復
+  try {
+    showError('');
+    const name = ensureName();
+    const code = customCodeInput.value.trim().toUpperCase();
+    const res = await emit('createRoom', { name, code: code || undefined });
+    if (res.error) return showError(res.error);
+    go(res.code, res.playerId, name);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
-$('join').addEventListener('click', async () => {
-  showError('');
-  const name = ensureName();
-  const code = codeInput.value.trim().toUpperCase();
-  if (!code) return showError('請輸入房號');
-  const res = await emit('joinRoom', { code, name });
-  if (res.error) return showError(res.error);
-  go(res.code, res.playerId, name);
+$('join').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true; // 防連點:等待期間鎖住,完成(成功跳轉或失敗)後恢復
+  try {
+    showError('');
+    const name = ensureName();
+    const code = codeInput.value.trim().toUpperCase();
+    if (!code) return showError('請輸入房號');
+    const res = await emit('joinRoom', { code, name });
+    if (res.error) return showError(res.error);
+    go(res.code, res.playerId, name);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Enter 快捷

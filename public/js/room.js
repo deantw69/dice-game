@@ -69,6 +69,22 @@ async function doRejoin() {
   }
 }
 socket.on('connect', doRejoin);
+
+// ---- 斷線提示橫幅:斷線時固定於頁面上方顯示,重連成功即隱藏 ----
+let netBanner = null;
+function setNetBanner(show) {
+  if (!netBanner) {
+    netBanner = document.createElement('div');
+    netBanner.id = 'netBanner';
+    netBanner.className = 'net-banner';
+    netBanner.textContent = '⚠️ 連線中斷,重連中…';
+    netBanner.style.display = 'none';
+    document.body.appendChild(netBanner);
+  }
+  netBanner.style.display = show ? '' : 'none';
+}
+socket.on('disconnect', () => setNetBanner(true));
+socket.on('connect', () => setNetBanner(false));
 let modes = [];
 socket.on('modes', (m) => { modes = m; });
 let renderPending = false;
@@ -80,11 +96,48 @@ function scheduleRender() {
 socket.on('roomState', (s) => { state = s; state.modes = modes; scheduleRender(); });
 
 // 被房主踢出
-socket.on('kicked', () => {
+socket.on('kicked', async () => {
   clearSession();
-  alert('你已被房主移出房間');
+  await uiAlert('你已被房主移出房間');
   location.href = '/';
 });
+
+// ---- 自訂確認/提示框(取代原生 confirm/alert,沿用深色卡片風格) ----
+// uiConfirm(msg) → Promise<boolean>;uiAlert(msg) → Promise<void>;點遮罩或 Esc 視同取消
+function uiDialog(msg, { showCancel }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const close = (val) => { overlay.remove(); resolve(val); };
+    overlay._close = close; // Esc 關閉用(視同取消)
+    const box = document.createElement('div');
+    box.className = 'confirm-box';
+    const msgEl = document.createElement('div');
+    msgEl.className = 'confirm-msg';
+    msgEl.textContent = msg;
+    const btns = document.createElement('div');
+    btns.className = 'confirm-btns';
+    const okBtn = document.createElement('button');
+    okBtn.textContent = '確定';
+    okBtn.addEventListener('click', () => close(true));
+    btns.appendChild(okBtn);
+    if (showCancel) {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'secondary';
+      cancelBtn.textContent = '取消';
+      cancelBtn.addEventListener('click', () => close(false));
+      btns.appendChild(cancelBtn);
+    }
+    box.appendChild(msgEl);
+    box.appendChild(btns);
+    overlay.appendChild(box);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    document.body.appendChild(overlay);
+    okBtn.focus();
+  });
+}
+function uiConfirm(msg) { return uiDialog(msg, { showCancel: true }); }
+function uiAlert(msg) { return uiDialog(msg, { showCancel: false }).then(() => {}); }
 
 // ---- 小工具 ----
 let toastTimer;
@@ -221,14 +274,14 @@ function render() {
   if (_lr && _lr.seq !== lastRollSeq) {
     pokerRerollAnim = true;
     if (pokerRerollTimer) clearTimeout(pokerRerollTimer);
-    pokerRerollTimer = setTimeout(() => { pokerRerollAnim = false; render(); }, 1450);
+    pokerRerollTimer = setTimeout(() => { pokerRerollAnim = false; scheduleRender(); }, 1450);
   }
 
   // 回合結束(playing→lobby):骰子動畫還在跑,延後 1.5s 才顯示順序按鈕等大廳結果 UI
   if (prevStatus === 'playing' && state.status === 'lobby') {
     roundEndAnim = true;
     if (roundEndTimer) clearTimeout(roundEndTimer);
-    roundEndTimer = setTimeout(() => { roundEndAnim = false; if (state) render(); }, 1500);
+    roundEndTimer = setTimeout(() => { roundEndAnim = false; if (state) scheduleRender(); }, 1500);
   }
   prevStatus = state.status;
 
@@ -645,6 +698,7 @@ $('modeInfoPopup')?.addEventListener('click', (e) => {
   if (!e.target.closest || !e.target.closest('.rank-card')) setModeInfoPopup(false);
 });
 
+let rosterHtmlCache = null;   // roster 最終 html 簽章:沒變就跳過 innerHTML 與重綁
 function renderRoster() {
   const el = $('rosterBody');
   const canReorderGlobal = !roundEndAnim && state.you.isHost && state.status === 'lobby' && state.players.length > 1;
@@ -685,7 +739,7 @@ function renderRoster() {
     const lossSig = String(serverLosses);
     if (lossSettled[p.id] !== serverLosses && lossPending[p.id] !== lossSig) {
       lossPending[p.id] = lossSig;
-      setTimeout(() => { lossSettled[p.id] = serverLosses; lossPending[p.id] = null; if (state) render(); }, 1500);
+      setTimeout(() => { lossSettled[p.id] = serverLosses; lossPending[p.id] = null; if (state) scheduleRender(); }, 1500);
     }
     const losses = lossSettled[p.id];
     let extra = ` <span class="muted">輸 ${losses} 次</span>`;
@@ -710,7 +764,10 @@ function renderRoster() {
     html += state.away.map((p) => playerRow(p)).join('');
     html += '</ul>';
   }
+  // 內容沒變 → 跳過 innerHTML 重建與重綁(事件 handler 都在點擊時讀最新 state,跳過安全)
+  if (html === rosterHtmlCache) return;
   el.innerHTML = html;
+  rosterHtmlCache = html;
 
   // 房主:丟入暫離觀戰區
   el.querySelectorAll('[data-bench]').forEach((b) =>
@@ -718,14 +775,14 @@ function renderRoster() {
   );
   // 房主:踢人按鈕
   el.querySelectorAll('[data-kick]').forEach((b) =>
-    b.addEventListener('click', () => {
-      if (confirm('確定要將此玩家移出房間嗎?')) act('kickPlayer', { targetId: b.dataset.kick });
+    b.addEventListener('click', async () => {
+      if (await uiConfirm('確定要將此玩家移出房間嗎?')) act('kickPlayer', { targetId: b.dataset.kick });
     })
   );
   // 房主:指定為房主
   el.querySelectorAll('[data-host]').forEach((b) =>
-    b.addEventListener('click', () => {
-      if (confirm('確定把房主轉移給此玩家嗎?')) act('transferHost', { targetId: b.dataset.host });
+    b.addEventListener('click', async () => {
+      if (await uiConfirm('確定把房主轉移給此玩家嗎?')) act('transferHost', { targetId: b.dataset.host });
     })
   );
   // 房主:上下移動調整玩家順序(送出完整新順序陣列)
@@ -761,7 +818,7 @@ function renderLobby() {
       + `<button id="start" ${state.modeId ? '' : 'disabled'}>${startButtonLabel()}</button>`
       + `<button id="changeMode" class="secondary">🔧 換模式</button>`
       + `</div>`;
-    $('start')?.addEventListener('click', () => act('startRound', {}));
+    $('start')?.addEventListener('click', startRoundOnce);
     $('changeMode')?.addEventListener('click', () => { lobbyExpanded = true; render(); });
     return;
   }
@@ -824,7 +881,15 @@ function renderLobby() {
   $('rouletteAbility')?.addEventListener('change', (e) => act('setRouletteAbility', { value: e.target.value }));
   $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
   $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
-  $('start')?.addEventListener('click', () => act('startRound', {}));
+  $('start')?.addEventListener('click', startRoundOnce);
+}
+
+// 開始遊戲:點擊即 disabled 防連點;ack 回來後恢復(成功時按鈕多半已被 render 重建)
+async function startRoundOnce(e) {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try { await act('startRound', {}); }
+  finally { btn.disabled = false; }
 }
 
 // 吹牛玩法不自動下一場(一定要房主手動按):吹牛骰模式、或混合模式上一局是吹牛子玩法
@@ -901,13 +966,29 @@ function setupSpeedClock() {
   tick();
 }
 
-// 手速骰冷卻:倒數期間每 100ms 重畫搖骰鈕(顯示剩餘秒數),到時自動解鎖
+// 手速骰冷卻:倒數期間直改搖骰鈕的文字/禁用(不整頁 render,避免打斷骰子動畫);
+// 冷卻結束的最後一 tick 還原成 renderControls 產出的初始文案並解鎖
 function scheduleSpeedCooldownRender() {
   if (speedCooldownTimer) return;
-  speedCooldownTimer = setInterval(() => {
-    if (Date.now() >= speedRollReadyAt) { clearInterval(speedCooldownTimer); speedCooldownTimer = null; }
-    if (state) scheduleRender();
-  }, 100);
+  const tick = () => {
+    const btn = $('speedReroll'); // 按鈕可能被 render 重建,每次重查
+    const wait = speedRollReadyAt - Date.now();
+    if (wait <= 0) {
+      clearInterval(speedCooldownTimer); speedCooldownTimer = null;
+      if (btn) {
+        const g = state && state.game;
+        const first = !(((g && g.myDice) || []).length);
+        btn.textContent = `🎲 ${first ? '搖骰!' : '重骰(未鎖的)'}`;
+        btn.disabled = false;
+      }
+      return;
+    }
+    if (btn) {
+      btn.textContent = `⏳ ${(wait / 1000).toFixed(1)}s`;
+      btn.disabled = true;
+    }
+  };
+  speedCooldownTimer = setInterval(tick, 100);
 }
 
 function renderBanner() {
@@ -1036,6 +1117,17 @@ function renderBanner() {
       const nmL = (id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; };
       const losers = (g.reveal.losers || []).map(nmL).join('、');
       return show(losers ? `⏱️ 結束! ・ 💀 ${losers} 輸了!` : '⏱️ 結束!無人落敗');
+    }
+    el.style.display = 'none'; el.innerHTML = '';
+    return;
+  }
+
+  // 純搖骰:擲骰進度(全搖完 / 結果階段維持原行為 → 隱藏)
+  if (g && g.mode === 'roll') {
+    if (state.status === 'playing' && g.phase === 'rolling') {
+      const done = (g.rolled || []).length;
+      const total = state.players.length;
+      if (done < total) return show(`🎲 擲骰中… (<strong>${done}/${total}</strong> 已搖完)`);
     }
     el.style.display = 'none'; el.innerHTML = '';
     return;
@@ -1174,7 +1266,7 @@ function renderBoard() {
         info.innerHTML = `<span class="sum-pill${lead ? ' lead' : ''}"${hide}>${lead ? '🥇 ' : ''}總和 ${sum}</span>`;
         if (!settled && rollPending[p.id] !== sig) {
           rollPending[p.id] = sig;
-          setTimeout(() => { rollSettled[p.id] = sig; if (state) render(); }, 1500);
+          setTimeout(() => { rollSettled[p.id] = sig; if (state) scheduleRender(); }, 1500);
         }
       } else {
         stage.innerHTML = '<div class="waiting">尚未搖骰</div>';
@@ -1326,7 +1418,7 @@ function renderBoard() {
             speedLastMyRolls = myRolls;
             speedRolling = true;
             clearTimeout(speedRollingTimer);
-            speedRollingTimer = setTimeout(() => { speedRolling = false; render(); }, 1500);
+            speedRollingTimer = setTimeout(() => { speedRolling = false; scheduleRender(); }, 1500);
           } else {
             showDice(stage, 'cell-' + p.id, dice, false, true);
           }
@@ -1438,33 +1530,42 @@ function renderBoard() {
   if (isNewRoll) lastRollSeq = lastRoll.seq; // 標記本次重骰動畫已播放
 }
 
+let controlsHtmlCache = null; // controls 最終 html 簽章:沒變就跳過 innerHTML 與重綁
 function renderControls() {
   const el = $('controls');
   const g = state.game;
+  // 內容沒變 → 跳過 innerHTML 重建與重綁(回傳 false);有變才寫入並更新快取
+  const setControls = (html) => {
+    if (html === controlsHtmlCache) return false;
+    el.innerHTML = html;
+    controlsHtmlCache = html;
+    return true;
+  };
   // 預設視為「有動作條內容」(手機直向會把 #controls 固定到底部);房主大廳分支會關掉
   document.body.classList.add('has-bottom-controls');
   if (state.you.isAway) {
     el.style.display = '';
-    el.innerHTML = '<p class="muted">💤 你被移到暫離觀戰區</p>'
-      + '<button id="imback">🙋 我回來了</button>';
-    $('imback')?.addEventListener('click', () => act('imBack', {}));
+    if (setControls('<p class="muted">💤 你被移到暫離觀戰區</p>'
+      + '<button id="imback">🙋 我回來了</button>')) {
+      $('imback')?.addEventListener('click', () => act('imBack', {}));
+    }
     return;
   }
   if (state.you.isSpectator) {
     el.style.display = '';
-    el.innerHTML = '<p class="muted">👀 觀戰中,下一輪開始時自動加入</p>';
+    setControls('<p class="muted">👀 觀戰中,下一輪開始時自動加入</p>');
     return;
   }
   // 非進行中(大廳/回合結束):房主用 lobby panel;非房主在 controls 顯示等待字樣
   if (!g || state.status !== 'playing') {
     if (state.you.isHost) {
       el.style.display = 'none';
-      el.innerHTML = '';
+      setControls('');
       document.body.classList.remove('has-bottom-controls'); // 房主大廳:無動作條
     } else {
       const h = state.players.find((p) => p.id === state.hostId);
       el.style.display = '';
-      el.innerHTML = `<p class="muted">等待房主 ${esc(h ? h.name : '')} 選擇模式並開始…</p>`;
+      setControls(`<p class="muted">等待房主 ${esc(h ? h.name : '')} 選擇模式並開始…</p>`);
     }
     return;
   }
@@ -1472,9 +1573,9 @@ function renderControls() {
 
   if (g.mode === 'roll' && state.status === 'playing') {
     const rolled = g.rolls[myId];
-    el.innerHTML = rolled
+    setControls(rolled
       ? '<p class="muted">已搖骰,等待其他玩家…</p>'
-      : rollBtn('🎲 搖骰!');
+      : rollBtn('🎲 搖骰!'));
     return; // 搖骰改由「按住→放開」處理(見 pressRoll/releaseRoll)
   }
 
@@ -1485,11 +1586,11 @@ function renderControls() {
       const ready = g.allocReady && g.allocReady[myId];
       const readyCount = g.order ? g.order.filter((id) => g.allocReady && g.allocReady[id]).length : 0;
       if (ready) {
-        el.innerHTML = `<p class="muted">已分配(⏭️${myAlloc.passes} / 🔄${myAlloc.reverses}),等待其他玩家… (${readyCount}/${(g.order || []).length})</p>`;
+        setControls(`<p class="muted">已分配(⏭️${myAlloc.passes} / 🔄${myAlloc.reverses}),等待其他玩家… (${readyCount}/${(g.order || []).length})</p>`);
       } else {
         const p = myAlloc.passes;
         const r = myAlloc.reverses;
-        el.innerHTML = '<div class="alloc-panel">'
+        const html = '<div class="alloc-panel">'
           + `<div class="alloc-title">分配特殊功能 (共 ${pts} 點)</div>`
           + '<div class="alloc-row">'
           + `<span>⏭️ 跳過</span>`
@@ -1505,27 +1606,31 @@ function renderControls() {
           + '</div>'
           + `<button id="allocConfirm"${p + r !== pts ? ' disabled' : ''}>✅ 確認 (${p + r}/${pts})</button>`
           + '</div>';
-        el.querySelectorAll('[data-adj]').forEach((btn) => btn.addEventListener('click', () => {
-          const a = btn.dataset.adj;
-          const cur = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
-          let np = cur.passes, nr = cur.reverses;
-          if (a === 'pass+1' && np + nr < pts) np++;
-          else if (a === 'pass-1' && np > 0) np--;
-          else if (a === 'rev+1' && np + nr < pts) nr++;
-          else if (a === 'rev-1' && nr > 0) nr--;
-          else return;
-          act('action', { type: 'allocate', passes: np, reverses: nr });
-        }));
-        $('allocConfirm')?.addEventListener('click', () => {
-          const cur = (g.alloc && g.alloc[myId]) || { passes: 0, reverses: 0 };
-          act('action', { type: 'allocate', passes: cur.passes, reverses: cur.reverses, confirm: true });
-        });
+        if (setControls(html)) {
+          el.querySelectorAll('[data-adj]').forEach((btn) => btn.addEventListener('click', () => {
+            const a = btn.dataset.adj;
+            const gg = state.game;
+            const cur = (gg && gg.alloc && gg.alloc[myId]) || { passes: 0, reverses: 0 };
+            let np = cur.passes, nr = cur.reverses;
+            if (a === 'pass+1' && np + nr < pts) np++;
+            else if (a === 'pass-1' && np > 0) np--;
+            else if (a === 'rev+1' && np + nr < pts) nr++;
+            else if (a === 'rev-1' && nr > 0) nr--;
+            else return;
+            act('action', { type: 'allocate', passes: np, reverses: nr });
+          }));
+          $('allocConfirm')?.addEventListener('click', () => {
+            const gg = state.game;
+            const cur = (gg && gg.alloc && gg.alloc[myId]) || { passes: 0, reverses: 0 };
+            act('action', { type: 'allocate', passes: cur.passes, reverses: cur.reverses, confirm: true });
+          });
+        }
       }
       return;
     }
     if (g.phase === 'playing') {
       if (g.autoRolling) {
-        el.innerHTML = '<p class="muted">⚡ 安全區快速骰…</p>';
+        setControls('<p class="muted">⚡ 安全區快速骰…</p>');
       } else {
         const curId = (g.order || [])[g.turnIndex];
         if (curId === myId) {
@@ -1534,20 +1639,22 @@ function renderControls() {
           const revLeft = myAlloc.reverses - ((g.reverses && g.reverses[myId]) || 0);
           const passDisabled = passLeft <= 0 ? ' disabled' : '';
           const revDisabled = revLeft <= 0 ? ' disabled' : '';
-          el.innerHTML = '<div class="bid-row roulette-actions">'
+          const html = '<div class="bid-row roulette-actions">'
             + rollBtn('🎲 搖骰!')
             + `<button id="rouletteReverse" class="secondary"${revDisabled}>🔄迴轉(${Math.max(0, revLeft)})</button>`
             + `<button id="roulettePass" class="secondary"${passDisabled}>⏭️跳過(${Math.max(0, passLeft)})</button>`
             + '</div>';
-          $('rouletteReverse')?.addEventListener('click', () => act('action', { type: 'reverse' }));
-          $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
+          if (setControls(html)) {
+            $('rouletteReverse')?.addEventListener('click', () => act('action', { type: 'reverse' }));
+            $('roulettePass')?.addEventListener('click', () => act('action', { type: 'pass' }));
+          }
         } else {
           const nm = state.players.find((x) => x.id === curId);
-          el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`;
+          setControls(`<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 搖骰…</p>`);
         }
       }
     } else {
-      el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
+      setControls('<p class="muted">本輪結束,等待房主開下一輪…</p>');
     }
     return;
   }
@@ -1557,62 +1664,68 @@ function renderControls() {
       const curId = (g.order || [])[g.turnIndex];
       const myStood = !!(g.hands && g.hands[myId] && g.hands[myId].done);
       if (curId === myId) {
-        el.innerHTML = '<div class="bid-row">'
+        const html = '<div class="bid-row">'
           + [1, 2, 3].map(n =>
             `<button class="bj-hit" data-n="${n}">🎲 要${n}顆</button>`
           ).join('')
           + '<button id="bjStand" class="secondary">✋ 停牌</button>'
           + '</div>';
-        el.querySelectorAll('.bj-hit').forEach(b => b.addEventListener('click', () => {
-          act('action', { type: 'roll', count: Number(b.dataset.n) });
-        }));
-        $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+        if (setControls(html)) {
+          el.querySelectorAll('.bj-hit').forEach(b => b.addEventListener('click', () => {
+            act('action', { type: 'roll', count: Number(b.dataset.n) });
+          }));
+          $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+        }
       } else if (myStood) {
         const nm = state.players.find((x) => x.id === curId);
-        el.innerHTML = `<p class="muted">你已停牌 ・ 等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`;
+        setControls(`<p class="muted">你已停牌 ・ 等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`);
       } else if ((g.order || []).includes(myId)) {
         const nm = state.players.find((x) => x.id === curId);
-        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`
+        const html = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`
           + '<div class="bid-row"><button id="bjStand" class="secondary">✋ 提前停牌</button></div>';
-        $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+        if (setControls(html)) {
+          $('bjStand')?.addEventListener('click', () => act('action', { type: 'stand' }));
+        }
       } else {
         const nm = state.players.find((x) => x.id === curId);
-        el.innerHTML = `<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`;
+        setControls(`<p class="muted">等待 <span class="hl">${esc(nm ? nm.name : '')}</span> 行動…</p>`);
       }
     } else {
-      el.innerHTML = '<p class="muted">本輪結束,等待房主開下一輪…</p>';
+      setControls('<p class="muted">本輪結束,等待房主開下一輪…</p>');
     }
     return;
   }
 
   if (g.mode === 'speed' && state.status === 'playing') {
     if (g.phase === 'countdown') {
-      el.innerHTML = '<p class="muted">⏳ 倒數中…準備搶骰!</p>';
+      setControls('<p class="muted">⏳ 倒數中…準備搶骰!</p>');
       return;
     }
     if (g.phase === 'racing' || speedRolling) {
       if ((g.done || []).includes(myId) && !speedRolling) {
-        el.innerHTML = '<p class="muted">✅ 你已達標安全!等待其他人…</p>';
+        setControls('<p class="muted">✅ 你已達標安全!等待其他人…</p>');
       } else if (!(g.done || []).includes(myId) || speedRolling) {
         const first = !((g.myDice || []).length);
         const wait = Math.max(0, speedRollReadyAt - Date.now());
         const onCd = wait > 0;
         const label = onCd ? `⏳ ${(wait / 1000).toFixed(1)}s` : `🎲 ${first ? '搖骰!' : '重骰(未鎖的)'}`;
-        el.innerHTML = '<div class="bid-row">'
+        const html = '<div class="bid-row">'
           + `<button id="speedReroll"${onCd ? ' disabled' : ''}>${label}</button>`
           + '</div>' + `<p class="hint muted"${first ? ' style="visibility:hidden"' : ''}>點骰子可鎖定不重骰</p>`;
-        $('speedReroll')?.addEventListener('click', () => {
-          if (Date.now() < speedRollReadyAt) return;
-          speedRollReadyAt = Date.now() + 1000;            // 樂觀冷卻;以伺服器回應為準
-          act('action', { type: 'reroll' }).then((res) => {
-            // 伺服器拒絕(冷卻未到)→ 以伺服器剩餘時間校正
-            if (res && res.cooldown && res.retryMs) speedRollReadyAt = Date.now() + res.retryMs;
+        if (setControls(html)) {
+          $('speedReroll')?.addEventListener('click', () => {
+            if (Date.now() < speedRollReadyAt) return;
+            speedRollReadyAt = Date.now() + 1000;            // 樂觀冷卻;以伺服器回應為準
+            act('action', { type: 'reroll' }).then((res) => {
+              // 伺服器拒絕(冷卻未到)→ 以伺服器剩餘時間校正
+              if (res && res.cooldown && res.retryMs) speedRollReadyAt = Date.now() + res.retryMs;
+            });
+            scheduleSpeedCooldownRender();
           });
-          scheduleSpeedCooldownRender();
-        });
+        }
       }
     } else {
-      el.innerHTML = '<p class="muted">本局結束,等待房主開下一局…</p>';
+      setControls('<p class="muted">本局結束,等待房主開下一局…</p>');
     }
     return;
   }
@@ -1623,12 +1736,13 @@ function renderControls() {
         const p = state.players.find((x) => x.id === id);
         return `<button class="chip pick-loser-btn" data-pid="${id}">${esc(p ? p.name : id)}</button>`;
       }).join('');
-      el.innerHTML = `<div class="mode-btns">${btns}</div>`;
-      el.querySelectorAll('.pick-loser-btn').forEach((b) =>
-        b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
-      );
+      if (setControls(`<div class="mode-btns">${btns}</div>`)) {
+        el.querySelectorAll('.pick-loser-btn').forEach((b) =>
+          b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
+        );
+      }
     } else {
-      el.innerHTML = '<p class="muted">等待房主選出輸家…</p>';
+      setControls('<p class="muted">等待房主選出輸家…</p>');
     }
     return;
   }
@@ -1636,13 +1750,15 @@ function renderControls() {
   if (g.mode === 'liars' && state.status === 'playing' && g.phase === 'rolling') {
     const rolled = (g.rolled || []).includes(myId);
     const allRolled = (g.order || []).length > 0 && (g.rolled || []).length === g.order.length;
-    el.innerHTML = '<div class="bid-row">'
+    const html = '<div class="bid-row">'
       + (rolled
         ? `<span class="muted">${allRolled ? '全員已搖完' : '已搖骰,等待其他人…'}</span>`
         : '<button id="roll" title="按住搖、放開定">🎲 搖骰!</button>')
       + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
       + '</div>';
-    $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
+    if (setControls(html)) {
+      $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
+    }
     return;
   }
 
@@ -1650,9 +1766,9 @@ function renderControls() {
     if (g.phase === 'rolling' || g.phase === 'reveal') {
       const rolled = g.phase === 'rolling' && (g.rolled || []).includes(myId);
       const label = g.phase === 'reveal' ? '🎲 搖下一骰!' : '🎲 搖骰!';
-      el.innerHTML = rolled
+      setControls(rolled
         ? '<p class="muted">已搖骰,等待其他人…</p>'
-        : rollBtn(label);
+        : rollBtn(label));
       return; // 搖骰改由「按住→放開」處理
     }
     if (g.phase === 'pokerCompare') {
@@ -1665,15 +1781,17 @@ function renderControls() {
         const cost = (hasLock && !lockPaid) ? 2 : 1;
         const canAfford = left >= cost;
         const costNote = cost > 1 ? `,本次扣 ${cost}` : '';
-        el.innerHTML = '<div class="bid-row">'
+        const html = '<div class="bid-row">'
           + `<button id="reroll"${canAfford ? '' : ' disabled'} title="按住不放,放開才重骰">🎲 重骰 (剩 ${left}${costNote})</button>`
           + '<button id="concede" class="secondary">🏳️ 認輸</button>'
           + '</div>';
         // 重骰改由「按住→放開」處理(見 pressRoll/releaseRoll),與一般搖骰一致;次數不足時按鈕 disabled
-        $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
+        if (setControls(html)) {
+          $('concede')?.addEventListener('click', () => act('action', { type: 'concede' }));
+        }
       } else {
         const names = low.map((id) => { const p = state.players.find((x) => x.id === id); return p ? `<span class="hl">${esc(p.name)}</span>` : ''; }).join('、');
-        el.innerHTML = `<p class="muted">等待 ${names} 重骰或認輸…</p>`;
+        setControls(`<p class="muted">等待 ${names} 重骰或認輸…</p>`);
       }
       return;
     }
@@ -1683,50 +1801,57 @@ function renderControls() {
           const p = state.players.find((x) => x.id === id);
           return `<button class="chip pick-loser-btn" data-pid="${id}">${esc(p ? p.name : id)}</button>`;
         }).join('');
-        el.innerHTML = `<div class="mode-btns">${btns}</div>`;
-        el.querySelectorAll('.pick-loser-btn').forEach((b) =>
-          b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
-        );
+        if (setControls(`<div class="mode-btns">${btns}</div>`)) {
+          el.querySelectorAll('.pick-loser-btn').forEach((b) =>
+            b.addEventListener('click', () => act('action', { type: 'pickLoser', targetId: b.dataset.pid }))
+          );
+        }
       } else {
-        el.innerHTML = '<p class="muted">等待房主選出輸家…</p>';
+        setControls('<p class="muted">等待房主選出輸家…</p>');
       }
       return;
     }
     if (g.phase === 'bluffReady') {
       const allRolled = (g.order || []).length > 0 && (g.rolled || []).length === g.order.length;
-      el.innerHTML = '<div class="bid-row"><span class="muted">全員已搖完</span>'
+      const html = '<div class="bid-row"><span class="muted">全員已搖完</span>'
         + (allRolled ? '<button id="grab" class="secondary">✊ 抓(開盅)!</button>' : '')
         + '</div>';
-      $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
+      if (setControls(html)) {
+        $('grab')?.addEventListener('click', () => act('action', { type: 'grab' }));
+      }
       return;
     }
     if (g.phase === 'choosing') {
       // 提示文字已在 banner 顯示;這裡只放按鈕,不是決定者則留空
-      if (g.decider && g.decider !== myId) { el.innerHTML = ''; return; }
-      el.innerHTML = `<div class="mode-btns">`
+      if (g.decider && g.decider !== myId) { setControls(''); return; }
+      const html = `<div class="mode-btns">`
         + (g.subGames || []).map((s) => `<button class="chip" data-sub="${s.id}">${esc(s.name)}</button>`).join('')
         + `</div>`;
-      el.querySelectorAll('[data-sub]').forEach((b) =>
-        b.addEventListener('click', () => act('action', { type: 'chooseSubGame', subGame: b.dataset.sub }))
-      );
+      if (setControls(html)) {
+        el.querySelectorAll('[data-sub]').forEach((b) =>
+          b.addEventListener('click', () => act('action', { type: 'chooseSubGame', subGame: b.dataset.sub }))
+        );
+      }
       return;
     }
     if (g.phase === 'condition') {
       // 提示/等待文字已在 banner 顯示;這裡只放按鈕,不是決定者則留空
       const canPick = g.openPick || g.chooserId === myId;
-      if (!canPick) { el.innerHTML = ''; return; }
+      if (!canPick) { setControls(''); return; }
       const opts = [['red', '紅的拿掉'], ['black', '黑的拿掉'], ['odd', '單數拿掉'], ['even', '雙數拿掉'], ['big', '大的拿掉'], ['small', '小的拿掉']];
-      el.innerHTML = `<div class="mode-btns">`
+      const html = `<div class="mode-btns">`
         + opts.map(([id, label]) => `<button class="chip" data-cond="${id}">${label}</button>`).join('')
         + `</div>`;
-      el.querySelectorAll('[data-cond]').forEach((b) =>
-        b.addEventListener('click', () => act('action', { type: 'chooseCondition', condition: b.dataset.cond }))
-      );
+      if (setControls(html)) {
+        el.querySelectorAll('[data-cond]').forEach((b) =>
+          b.addEventListener('click', () => act('action', { type: 'chooseCondition', condition: b.dataset.cond }))
+        );
+      }
       return;
     }
   }
 
-  el.innerHTML = '<p class="muted">等待中…</p>';
+  setControls('<p class="muted">等待中…</p>');
 }
 
 // ---- helpers ----
@@ -1899,18 +2024,39 @@ $('qrClose').addEventListener('click', closeQr);
 $('qrOverlay').addEventListener('click', (e) => { if (e.target === $('qrOverlay')) closeQr(); });
 
 $('leave').addEventListener('click', async () => {
+  // 遊戲進行中 → 先確認才離開;非遊戲中維持直接離開
+  if (state?.status === 'playing' && !(await uiConfirm('遊戲進行中,確定要離開房間嗎?'))) return;
   await emit('leaveRoom', {});
   clearSession();
   location.href = '/';
 });
-$('forceReset').addEventListener('click', () => {
-  if (confirm('確定強制重來?目前這場將中止,回到大廳重新開始。')) act('forceReset', {});
+$('forceReset').addEventListener('click', async () => {
+  if (await uiConfirm('確定強制重來?目前這場將中止,回到大廳重新開始。')) act('forceReset', {});
 });
-$('benchSelf').addEventListener('click', () => {
+$('benchSelf').addEventListener('click', async () => {
   const msg = state.you.isHost
     ? '確定暫離?房主會自動轉給下一位,按「我回來了」才會以觀戰身分回歸。'
     : '確定暫離?你會移到暫離觀戰區,按「我回來了」才回歸。';
-  if (confirm(msg)) act('benchSelf', {});
+  if (await uiConfirm(msg)) act('benchSelf', {});
+});
+
+// Esc 關閉彈窗:由上往下關閉「目前開著」的第一個(確認框視同取消)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const cf = document.querySelector('.confirm-overlay');
+  if (cf) { cf._close(false); return; }
+  const qr = $('qrOverlay');
+  if (qr && qr.style.display !== 'none') { closeQr(); return; }
+  if (pokerRankOpen) { setPokerRankPopup(false); return; }
+  if (modeInfoOpen) { setModeInfoPopup(false); return; }
+  const sp = $('statsPopup');
+  if (sp && sp.style.display !== 'none' && lastStatsKey) { statsDismissedKey = lastStatsKey; sp.style.display = 'none'; return; }
+  const wp = $('winnerPopup');
+  if (wp && wp.style.display !== 'none' && lastWinnerKey) { winnerDismissedKey = lastWinnerKey; wp.style.display = 'none'; return; }
+  const mp = $('milestonePopup');
+  if (mp && mp.style.display !== 'none' && lastMilestoneKey) { milestoneDismissed = lastMilestoneKey; mp.style.display = 'none'; return; }
+  const lp = $('loserPopup');
+  if (lp && lp.style.display !== 'none' && lastLoserKey) { loserDismissedKey = lastLoserKey; lp.style.display = 'none'; return; }
 });
 // 自動下一場(頂部常駐,房主隨時可切換)
 $('autoNext').addEventListener('change', (e) => {

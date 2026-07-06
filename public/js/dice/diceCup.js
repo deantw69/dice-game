@@ -47,7 +47,7 @@ export function createRenderer(container, options = {}) {
   // (用分離軸定理 SAT 對旋轉方塊做碰撞檢測;放不下就縮小骰子重排)。
   // 同一手期間沿用同一組位置與尺寸,換新一手(重搖)才重抽,
   // 確保 peek 蓋回/打開時骰子不跳動。
-  let positions = [];   // [{x, y, rot}](x/y 為左上角,供 CSS left/top)
+  let positions = [];   // [{x, y, rot}](x/y 為左上角,供 transform translate)
   let layoutCount = 0;
   let layoutDs = 56;    // 排版時實際採用的骰子尺寸(可能比 applyFit 更小,以容下不重疊)
 
@@ -121,6 +121,23 @@ export function createRenderer(container, options = {}) {
     layoutDs = d;
     layoutCount = n;
   }
+  // 位移/自轉全走外層 .die3d-scene 的 transform(合成層,不觸發 layout+paint);
+  // 3D 翻面 transition 在內層 .die3d,兩者不同元素、互不干擾。
+  // anchorScene:一次性把絕對定位錨在左上角(flex 容器的 abs 子元素靜態位置在中央,
+  // 須明確歸零)並宣告 will-change;動畫每幀只寫 setXform(單一 transform)。
+  function anchorScene(el) {
+    el.style.left = '0';
+    el.style.top = '0';
+    el.style.willChange = 'transform';
+  }
+  function setXform(el, x, y, rot) {
+    el.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`; // 外層 2D 旋轉,不影響內層點數朝向
+  }
+  // 從 transform 讀回目前位置/角度(供動畫沿用畫面上的位置);沒設過回 null
+  function getXform(el) {
+    const m = (el.style.transform || '').match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*rotate\(([-\d.]+)deg\)/);
+    return m ? { x: +m[1], y: +m[2], rot: +m[3] } : null;
+  }
   function applyPositions() {
     if (!scatter) return;
     tray.style.setProperty('--ds', layoutDs + 'px'); // 用排版時實際採用的尺寸(碰撞檢測即以此為準)
@@ -128,9 +145,8 @@ export function createRenderer(container, options = {}) {
     scenes.forEach((el, i) => {
       const p = positions[i];
       if (!p) return;
-      el.style.left = p.x + 'px';
-      el.style.top = p.y + 'px';
-      el.style.transform = `rotate(${p.rot}deg)`; // 外層 2D 旋轉,不影響內層點數朝向
+      anchorScene(el);
+      setXform(el, p.x, p.y, p.rot);
     });
   }
 
@@ -157,20 +173,19 @@ export function createRenderer(container, options = {}) {
     // 初始位置沿用骰子「目前畫面上的位置」(掀蓋前已不重疊),避免第一幀瞬移;
     // 沒有舊位置(數量改變→DOM 重建)才退回隨機。再給隨機初速與自轉,讓它們撞來撞去。
     const st = scenes.map((el) => {
-      const ox = parseFloat(el.style.left), oy = parseFloat(el.style.top);
-      const or = parseFloat((el.style.transform.match(/rotate\(([-\d.]+)deg\)/) || [])[1]);
+      anchorScene(el); // DOM 重建後尚未定位過也先錨定,動畫每幀才能只寫 transform
+      const o = getXform(el);
       return {
-        x: Number.isFinite(ox) ? Math.min(maxX, Math.max(0, ox)) : Math.random() * maxX,
-        y: Number.isFinite(oy) ? Math.min(maxY, Math.max(0, oy)) : Math.random() * maxY,
-        a: Number.isFinite(or) ? or : Math.random() * 360,
+        x: o ? Math.min(maxX, Math.max(0, o.x)) : Math.random() * maxX,
+        y: o ? Math.min(maxY, Math.max(0, o.y)) : Math.random() * maxY,
+        a: o ? o.rot : Math.random() * 360,
         vx: (Math.random() * 2 - 1) * 880, vy: (Math.random() * 2 - 1) * 880,
         va: (Math.random() * 2 - 1) * 820,
       };
     });
     const render = () => scenes.forEach((el, i) => {
       const s = st[i];
-      el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
-      el.style.transform = `rotate(${s.a}deg)`;
+      setXform(el, s.x, s.y, s.a); // 每幀僅寫 transform(合成層),不觸發 layout
     });
     // 把目前所有互相穿插的骰子推開(SAT),iters 次;動畫每幀做一次即可。
     function separate(iters) {

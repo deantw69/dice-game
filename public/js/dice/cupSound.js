@@ -10,15 +10,24 @@ function ctx() {
   return actx;
 }
 
-// 單一「喀」聲:短促帶通雜訊
+// 共用白噪音 buffer:lazy 建一次(綁定該 AudioContext 快取,重建 context 時跟著重建),
+// 每聲改播隨機切片,避免每聲 createBuffer+填亂數樣本造成 GC 壓力(playRattle 一次排 10~20 聲)。
+const NOISE_DUR = 1.5; // 秒
+let noiseBuf = null, noiseFor = null;
+function noiseBuffer(ac) {
+  if (noiseBuf && noiseFor === ac) return noiseBuf;
+  noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * NOISE_DUR), ac.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  noiseFor = ac;
+  return noiseBuf;
+}
+
+// 單一「喀」聲:短促帶通雜訊(從共用噪音 buffer 取隨機切片)
 function burst(ac, when) {
   const dur = 0.025 + Math.random() * 0.035;
-  const buf = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * dur)), ac.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-
   const src = ac.createBufferSource();
-  src.buffer = buf;
+  src.buffer = noiseBuffer(ac);
   const bp = ac.createBiquadFilter();
   bp.type = 'bandpass';
   bp.frequency.value = 1600 + Math.random() * 2600;
@@ -29,8 +38,7 @@ function burst(ac, when) {
   g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 
   src.connect(bp).connect(g).connect(ac.destination);
-  src.start(when);
-  src.stop(when + dur);
+  src.start(when, Math.random() * (NOISE_DUR - dur), dur); // 隨機起點切 dur 長度,聽感同原本整段亂數
 }
 
 // 提示音:輪到你時(話胚成為最小者)播兩聲嗶

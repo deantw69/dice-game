@@ -699,7 +699,9 @@ $('modeInfoPopup')?.addEventListener('click', (e) => {
 });
 
 let rosterHtmlCache = null;   // roster 最終 html 簽章:沒變就跳過 innerHTML 與重綁
+let draggingRoster = false;   // 拖曳排序進行中:暫停 roster 重建,避免中途 render 打斷拖曳
 function renderRoster() {
+  if (draggingRoster) return; // 拖曳中不重建 DOM
   const el = $('rosterBody');
   const canReorderGlobal = !roundEndAnim && state.you.isHost && state.status === 'lobby' && state.players.length > 1;
   const ob = $('rosterOrderBtns');
@@ -718,20 +720,24 @@ function renderRoster() {
     // 房主用皇冠取代綠點(不重複);其他玩家顯示連線狀態圓點
     const lead = isHost ? '<span class="crown">👑</span>' : `<span class="dot ${dot}"></span>`;
     const hostCtrl = state.you.isHost && p.id !== myId;
-    const benchBtn = (hostCtrl && opts.bench)
-      ? `<button class="bench" data-bench="${p.id}" title="丟入暫離觀戰區">💤</button>` : '';
+    const benchItem = (hostCtrl && opts.bench)
+      ? `<button class="rm-item bench" data-bench="${p.id}">💤 丟入暫離</button>` : '';
     const actions = hostCtrl
-      ? `<span class="row-actions">`
-        + benchBtn
-        + `<button class="mkhost" data-host="${p.id}" title="指定為房主">👑</button>`
-        + `<button class="kick" data-kick="${p.id}" title="踢出房間">✕</button>`
-        + `</span>`
+      ? `<span class="row-actions"><span class="row-menu">`
+        + `<button class="row-more" data-more="${p.id}" title="房主操作" aria-label="房主操作">⋯</button>`
+        + `<div class="row-pop" data-pop="${p.id}" hidden>`
+        + benchItem
+        + `<button class="rm-item mkhost" data-host="${p.id}">👑 轉讓房主</button>`
+        + `<button class="rm-item kick" data-kick="${p.id}">✕ 踢出房間</button>`
+        + `</div></span></span>`
       : '';
-    return `<li>${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
+    const handle = opts.reorder ? `<span class="drag-h" title="拖曳排序">⠿</span>` : '';
+    const liAttr = opts.reorder ? ` class="reorderable" data-pid="${p.id}"` : '';
+    return `<li${liAttr}>${handle}${lead}<span class="pname">${esc(p.name)}${me}</span>${extra}${actions}</li>`;
   };
   // 房主在大廳可手動調整玩家順序(▲▼);開局後順序鎖定,不顯示
   const canReorder = !roundEndAnim && state.you.isHost && state.status === 'lobby' && state.players.length > 1;
-  let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster">`;
+  let html = `<h3>玩家 (${state.players.length})</h3><ul class="roster" id="rosterPlayers">`;
   // 玩家列表固定用加入順序(state.players 原始順序:房主先、之後依加入先後)
   html += state.players.map((p, i) => {
     const serverLosses = (state.losses && state.losses[p.id]) || 0;
@@ -742,16 +748,8 @@ function renderRoster() {
       setTimeout(() => { lossSettled[p.id] = serverLosses; lossPending[p.id] = null; if (state) scheduleRender(); }, 1500);
     }
     const losses = lossSettled[p.id];
-    let extra = ` <span class="muted">輸 ${losses} 次</span>`;
-    if (canReorder) {
-      const up = i > 0 ? `data-up="${p.id}"` : 'disabled';
-      const down = i < state.players.length - 1 ? `data-down="${p.id}"` : 'disabled';
-      extra += `<span class="row-order">`
-        + `<button class="ord" ${up} title="上移">▲</button>`
-        + `<button class="ord" ${down} title="下移">▼</button>`
-        + `</span>`;
-    }
-    return playerRow(p, extra, { bench: true });
+    const extra = ` <span class="muted">輸 ${losses} 次</span>`;
+    return playerRow(p, extra, { bench: true, reorder: canReorder });
   }).join('');
   html += '</ul>';
   if (state.spectators.length) {
@@ -769,6 +767,21 @@ function renderRoster() {
   el.innerHTML = html;
   rosterHtmlCache = html;
 
+  // 房主操作 ⋯ 選單:點開/關,點到動作或選單外自動關
+  const closeRowPops = (except) => el.querySelectorAll('.row-pop').forEach((p) => { if (p !== except) p.hidden = true; });
+  el.querySelectorAll('[data-more]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const pop = el.querySelector(`.row-pop[data-pop="${b.dataset.more}"]`);
+      const willOpen = pop && pop.hidden;
+      closeRowPops(willOpen ? pop : null);
+      if (pop) pop.hidden = !willOpen;
+    })
+  );
+  if (!renderRoster._popOutside) {
+    renderRoster._popOutside = true;
+    document.addEventListener('click', () => { document.querySelectorAll('.row-pop').forEach((p) => (p.hidden = true)); });
+  }
   // 房主:丟入暫離觀戰區
   el.querySelectorAll('[data-bench]').forEach((b) =>
     b.addEventListener('click', () => act('benchPlayer', { targetId: b.dataset.bench }))
@@ -785,21 +798,51 @@ function renderRoster() {
       if (await uiConfirm('確定把房主轉移給此玩家嗎?')) act('transferHost', { targetId: b.dataset.host });
     })
   );
-  // 房主:上下移動調整玩家順序(送出完整新順序陣列)
-  const movePlayer = (id, dir) => {
-    const order = state.players.map((p) => p.id);
-    const i = order.indexOf(id);
-    const j = i + dir;
-    if (i === -1 || j < 0 || j >= order.length) return;
-    [order[i], order[j]] = [order[j], order[i]];
-    act('reorderPlayers', { order });
+  // 房主:拖曳手柄調整玩家順序(pointer 事件,鼠標/觸控通用;放開送出完整新順序陣列)
+  const pul = el.querySelector('#rosterPlayers');
+  if (canReorder && pul) {
+    pul.querySelectorAll('.drag-h').forEach((h) =>
+      h.addEventListener('pointerdown', (e) => startRosterDrag(e, pul, h))
+    );
+  }
+}
+
+// 拖曳排序:按住手柄後跟著手指/游標移動,依 Y 座標即時插入到對應位置,放開才送伺服器
+function startRosterDrag(e, ul, handle) {
+  const li = handle.closest('li.reorderable');
+  if (!li) return;
+  e.preventDefault();
+  // capture 綁在 ul(拖曳中不會被搬動),否則 li 一被 insertBefore 就會丟失 capture、pointermove 斷掉卡住
+  try { ul.setPointerCapture(e.pointerId); } catch {}
+  draggingRoster = true;
+  li.classList.add('dragging');
+  const move = (ev) => {
+    const y = ev.clientY;
+    const others = [...ul.querySelectorAll('li.reorderable:not(.dragging)')];
+    let placed = false;
+    for (const it of others) {
+      const r = it.getBoundingClientRect();
+      if (y < r.top + r.height / 2) { ul.insertBefore(li, it); placed = true; break; }
+    }
+    if (!placed) ul.appendChild(li);
   };
-  el.querySelectorAll('[data-up]').forEach((b) =>
-    b.addEventListener('click', () => movePlayer(b.dataset.up, -1))
-  );
-  el.querySelectorAll('[data-down]').forEach((b) =>
-    b.addEventListener('click', () => movePlayer(b.dataset.down, 1))
-  );
+  const up = () => {
+    ul.removeEventListener('pointermove', move);
+    ul.removeEventListener('pointerup', up);
+    ul.removeEventListener('pointercancel', up);
+    try { ul.releasePointerCapture(e.pointerId); } catch {}
+    li.classList.remove('dragging');
+    draggingRoster = false;
+    const order = [...ul.querySelectorAll('li.reorderable')].map((n) => n.dataset.pid);
+    const cur = state.players.map((p) => p.id);
+    if (order.length === cur.length && order.some((id, i) => id !== cur[i])) {
+      rosterHtmlCache = null; // 順序變了,強制下次 render 重建並綁定
+      act('reorderPlayers', { order });
+    }
+  };
+  ul.addEventListener('pointermove', move);
+  ul.addEventListener('pointerup', up);
+  ul.addEventListener('pointercancel', up);
 }
 
 function renderLobby() {

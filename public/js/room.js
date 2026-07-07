@@ -289,6 +289,7 @@ function render() {
   if (!pokerRerollAnim) renderLobby();    // 重骰動畫期間保留前一畫面(避免輸家骰子還沒停 lobby 就跳出)
   if (!pokerRerollAnim) renderBanner();   // 重骰動畫期間保留前一畫面
   renderBoard();                          // 骰子動畫照常播放
+  maybeBlackjack21Fx();                   // 21 點骰:開牌時若有人剛好 21 點 → 金光特效
   if (!pokerRerollAnim) renderControls(); // 重骰動畫期間保留前一畫面
   renderPokerGuide();
   renderModeInfo();
@@ -488,6 +489,45 @@ function playLeopardFx(label) {
     + `${ring1}${ring2}<div class="pao-label">🐆 ${label}</div>${parts}`;
   el.style.display = 'flex';
   playLeopard();
+  setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1600);
+}
+
+// 21 點骰:開牌(reveal / roundEnd)時,場上只要有人剛好 21 點就播一次金光特效(每局一次)
+function maybeBlackjack21Fx() {
+  const g = state && state.game;
+  if (!g || g.mode !== 'blackjack21' || (g.phase !== 'reveal' && g.phase !== 'roundEnd')) {
+    bj21Shown = false; // 非開牌階段 → 重置,下一局可再觸發
+    return;
+  }
+  if (bj21Shown) return;
+  const ids21 = Object.entries(g.hands || {})
+    .filter(([, h]) => h && h.total === 21 && !h.bust)
+    .map(([id]) => id);
+  if (!ids21.length) return;
+  bj21Shown = true;
+  const names = ids21.map((id) => { const p = state.players.find((x) => x.id === id); return p ? esc(p.name) : '?'; });
+  playBlackjack21Fx(names);
+}
+
+// 21 點骰:剛好湊到 21 點的特效 —— 金色爆閃 + 雙衝擊環 + 「🃏 21 點!」大字 + 撲克牌雨
+function playBlackjack21Fx(names = []) {
+  const el = $('handFx');
+  if (!el) return;
+  const cards = ['🃏', '🎴', '👑', '💰', '✨', '🃏', '🎴', '💰', '⭐', '🎰'];
+  const parts = cards.map((emo, i) => {
+    const ang = (Math.PI * 2 * i) / cards.length + (i % 2 ? 0.2 : -0.2);
+    const dist = 140 + (i % 3) * 60;
+    const dx = Math.round(Math.cos(ang) * dist);
+    const dy = Math.round(Math.sin(ang) * dist);
+    const rot = (i % 2 ? 1 : -1) * (140 + i * 40);
+    return `<div class="bj21-card" style="--dx:${dx}px;--dy:${dy}px;--rot:${rot}deg">${emo}</div>`;
+  }).join('');
+  const who = names.length ? `<div class="bj21-who">${names.join('、')}</div>` : '';
+  el.innerHTML = `<div class="bj21-flash"></div>`
+    + `<div class="bj21-ring"></div><div class="bj21-ring bj21-ring2"></div>`
+    + `<div class="bj21-label">🃏 21 點!</div>${who}${parts}`;
+  el.style.display = 'flex';
+  playFanfare();
   setTimeout(() => { el.style.display = 'none'; el.innerHTML = ''; }, 1600);
 }
 
@@ -1181,6 +1221,7 @@ function renderBanner() {
       const loserNames = g.reveal.losers.map((id) => `<span class="hl">${nm(id)}</span>`).join('、');
       return show(`💀 ${loserNames} 輸了!`);
     }
+    if (g.phase === 'reveal') return show('🃏 <strong>開牌!</strong> 比較各家點數中…');
     el.style.display = 'none'; el.innerHTML = '';
     return;
   }
@@ -1469,7 +1510,7 @@ function renderBoard() {
         bjMyDiceCount = 0;
         if (hand.dice && hand.dice.length) {
           showDice(stage, 'cell-' + p.id, hand.dice, false, true);
-          info.textContent = (hand.bust ? '💥 爆了! ' : '') + `點數 ${hand.total}`;
+          info.textContent = (hand.bust ? '💥 爆了! ' : '') + `點數 ${hand.total} ・ ${hand.dice.length} 顆`;
         } else {
           stage.innerHTML = '';
           info.textContent = '';
@@ -1950,6 +1991,7 @@ function esc(s) {
 // ---- 21 點骰:玩家選擇要牌顆數 ----
 let bjHitCount = 1;
 let bjMyDiceCount = 0;
+let bj21Shown = false; // 21 點骰:本局開牌時是否已為「剛好 21 點」播過特效(每局一次)
 
 // ---- 按住搖骰:按住時骰子一直轉,放開才送出搖骰並停在結果 ----
 const rollSpin = { active: false, committing: false, timer: null, seqAtPress: -1 };

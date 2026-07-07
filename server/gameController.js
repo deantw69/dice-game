@@ -169,6 +169,17 @@ export function speedConfirmAchieve(room, playerId, rollSeq, speedId) {
   if (changed && room.round.phase === 'roundEnd') { recordRoundLosers(room); finishIfMatchOver(room, MODES.speed); room.status = 'lobby'; }
   return changed;
 }
+// 21 點骰:reveal 停留後由 index.js 計時器呼叫,決出輸家並收尾回大廳
+export function blackjackSettle(room, revealId) {
+  if (room.modeId !== 'blackjack21' || !room.round) return false;
+  const changed = MODES.blackjack21.settle(room.round, room.match, revealId);
+  if (changed && room.round.phase === 'roundEnd') {
+    recordRoundLosers(room);
+    finishIfMatchOver(room, MODES.blackjack21);
+    room.status = 'lobby';
+  }
+  return changed;
+}
 export function speedTimeout(room) {
   if (room.modeId !== 'speed' || !room.round) return;
   MODES.speed.resolveTimeout(room.round, room.match);

@@ -226,6 +226,8 @@ io.on('connection', (socket) => {
     cb?.({ ok: true, cooldown: res.cooldown, retryMs: res.retryMs });
     broadcastRoom(room, { listChanged: room.status !== prevStatus });
     if (room.modeId === 'roulette') armRouletteAutoRoll(room); // 驚爆骰:手動骰後繼續自動骰
+    // 21 點骰:全員停牌 → 進 reveal 階段展示各家點數,延遲後才決出輸家
+    if (room.modeId === 'blackjack21' && room.round && room.round.phase === 'reveal') armBlackjackSettle(room);
     // 手速骰:達標判定延遲到骰子動畫跑完,所有玩家同步看到結果
     if (res.pendingAchieve) {
       const { pendingAchieve: pid, rollSeq, speedId } = res;
@@ -375,6 +377,20 @@ function armRouletteAutoRoll(room) {
     broadcastRoom(room);
     armRouletteAutoRoll(room);
   }, ROULETTE_AUTO_DELAY);
+}
+
+// 21 點骰:reveal 階段停留這麼久(展示各家點數/骰子數)後才決出輸家。
+// 用 round.revealId 當 nonce:換局/重排留下的過期 timer 會自動失效。
+const BLACKJACK_REVEAL_MS = 2500;
+function armBlackjackSettle(room) {
+  const round = room.round;
+  if (!round || room.modeId !== 'blackjack21') return;
+  const id = round.revealId;
+  setTimeout(() => {
+    const r = room.round;
+    if (!r || r.revealId !== id || r.phase !== 'reveal') return;
+    if (gc.blackjackSettle(room, id)) broadcastRoom(room, { listChanged: true });
+  }, BLACKJACK_REVEAL_MS);
 }
 
 httpServer.listen(PORT, () => {

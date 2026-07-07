@@ -3,6 +3,8 @@ import { rollDie } from '../util/rng.js';
 
 const DEFAULT_LIVES = 0;
 
+let revealSeq = 0; // 過期 settle 計時器自我失效用的 nonce 來源
+
 export const blackjack21 = {
   id: 'blackjack21',
   name: '21 點骰',
@@ -129,6 +131,14 @@ export const blackjack21 = {
       myBust: hand.bust,
     };
   },
+
+  // reveal 階段停留一段時間(先展示各家點數/骰子數)後,由 index.js 計時器呼叫此函式才決出輸家
+  settle(round, match, revealId) {
+    if (round.phase !== 'reveal') return false;
+    if (revealId != null && round.revealId !== revealId) return false;
+    settleReveal(round, match);
+    return true;
+  },
 };
 
 function advanceTurn(round) {
@@ -147,8 +157,12 @@ function checkAllDone(round, match) {
   const allDone = round.order.every((id) => round.hands[id].stood);
   if (!allDone) return;
 
+  // 先進 reveal 階段(僅翻開骰子/顯示點數,尚未決定輸家);由計時器延遲後再 settle
   round.phase = 'reveal';
+  round.revealId = ++revealSeq;
+}
 
+function settleReveal(round, match) {
   const busted = round.order.filter((id) => round.hands[id].bust);
   const notBusted = round.order.filter((id) => !round.hands[id].bust);
   let losers;

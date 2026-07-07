@@ -632,7 +632,21 @@ button.danger:hover { filter: brightness(1.08); }
 @keyframes paoBurst { 0% { transform: translate(0,0) scale(.2) rotate(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(var(--rot)); opacity: 0; } }
 .hand-fx .pao-ring { position: absolute; width: 30px; height: 30px; border-radius: 50%; border: 5px solid; animation: paoRing .9s cubic-bezier(.15,.7,.4,1) forwards; }
 @keyframes paoRing { 0% { transform: scale(.2); opacity: 1; border-width: 12px; } 100% { transform: scale(16); opacity: 0; border-width: 1px; } }
-@media (max-width: 600px) { .hand-fx .iron-label { font-size: 3.5rem; } .hand-fx .pao-label { font-size: 4.5rem; } .hand-fx .iron-star { font-size: 1.8rem; } .hand-fx .pao-burst { font-size: 2rem; } }
+
+/* 21 點骰:剛好 21 點特效 —— 金光爆閃 + 雙金環 + 大字 + 撲克牌雨 */
+.hand-fx .bj21-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,225,120,0.85), rgba(255,190,60,0.3) 40%, transparent 72%); animation: bj21Flash .8s ease-out forwards; }
+@keyframes bj21Flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+.hand-fx .bj21-ring { position: absolute; width: 60px; height: 60px; border-radius: 50%; border: 5px solid rgba(255,215,0,0.95); box-shadow: 0 0 40px rgba(255,200,0,0.7); animation: bj21Ring .9s cubic-bezier(.15,.7,.4,1) forwards; }
+.hand-fx .bj21-ring2 { animation-delay: .16s; border-color: rgba(255,180,40,0.9); }
+@keyframes bj21Ring { 0% { transform: scale(.3); opacity: 1; border-width: 12px; } 100% { transform: scale(12); opacity: 0; border-width: 1px; } }
+.hand-fx .bj21-label { position: absolute; font-size: 6rem; font-weight: 900; color: #ffd700; text-shadow: 0 0 30px rgba(255,210,0,0.9), 0 0 70px rgba(255,150,0,0.5), 0 4px 10px rgba(0,0,0,0.55); animation: bj21Label 1.5s ease-out forwards; }
+@keyframes bj21Label { 0% { transform: scale(.15) rotate(-12deg); opacity: 0; } 14% { transform: scale(1.4) rotate(5deg); opacity: 1; } 34% { transform: scale(1) rotate(0); } 72% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
+.hand-fx .bj21-card { position: absolute; font-size: 2.8rem; animation: bj21Card 1.2s ease-out forwards; }
+@keyframes bj21Card { 0% { transform: translate(0,0) scale(.2) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.25) rotate(var(--rot)); opacity: 0; } }
+.hand-fx .bj21-who { --wy: 4.6rem; position: absolute; font-size: 2.4rem; font-weight: 800; color: #fff; text-shadow: 0 0 18px rgba(255,210,0,0.9), 0 2px 6px rgba(0,0,0,0.6); text-align: center; animation: bj21Who 1.5s ease-out forwards; }
+@keyframes bj21Who { 0% { opacity: 0; transform: translateY(var(--wy)) scale(.6); } 20% { opacity: 0; } 34% { opacity: 1; transform: translateY(var(--wy)) scale(1.12); } 50% { transform: translateY(var(--wy)) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--wy)) scale(1.08); } }
+
+@media (max-width: 600px) { .hand-fx .iron-label { font-size: 3.5rem; } .hand-fx .pao-label { font-size: 4.5rem; } .hand-fx .iron-star { font-size: 1.8rem; } .hand-fx .pao-burst { font-size: 2rem; } .hand-fx .bj21-label { font-size: 4rem; } .hand-fx .bj21-card { font-size: 2rem; } .hand-fx .bj21-who { font-size: 1.6rem; --wy: 3.2rem; } }
 /* 輸到 10 倍數次嘲諷 popup */
 .milestone-popup { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .milestone-popup .milestone-card {

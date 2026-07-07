@@ -56,13 +56,15 @@ export function startRound(room, playerId) {
 
   if (mode.id === 'roulette' || mode.id === 'blackjack21') {
     if (!room.match || room.matchOver) {
-      // 單局模式(生命 0)每局都重建 match,保留驚爆骰上一把的分配以便沿用
+      // 單局模式(生命 0)每局都重建 match,保留驚爆骰上一把的分配與起始者以便沿用
       const prevAlloc = mode.id === 'roulette' ? room.match?.lastAlloc : null;
+      const prevStarter = mode.id === 'roulette' ? room.match?.nextStarter : null;
       const opts = mode.id === 'roulette'
         ? { lives: room.rouletteLives ?? 0, abilityPoints: room.rouletteAbility ?? 2 }
         : { lives: room.blackjackLives ?? 0 };
       room.match = mode.initMatch(room.players, opts);
       if (prevAlloc) room.match.lastAlloc = prevAlloc;
+      if (prevStarter) room.match.nextStarter = prevStarter;
       room.matchOver = false;
       room.winnerId = null;
     } else {

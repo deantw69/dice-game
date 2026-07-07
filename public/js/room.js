@@ -845,6 +845,53 @@ function startRosterDrag(e, ul, handle) {
   ul.addEventListener('pointercancel', up);
 }
 
+// 各模式的圖示與一行簡介(前端展示用;新增模式在這裡補一筆即可)
+const MODE_META = {
+  roll:        { icon: '🎲', desc: '比點數大小，最快分勝負' },
+  liars:       { icon: '🤥', desc: '蓋牌喊點數，抓對方吹牛' },
+  mixed:       { icon: '🎰', desc: '紅黑單雙／吹牛／話胚' },
+  roulette:    { icon: '💣', desc: '輪流累加，爆掉那個輸' },
+  blackjack21: { icon: '🃏', desc: '骰子加總逼近 21 不爆' },
+  speed:       { icon: '⚡', desc: '限時搶湊出指定牌型' },
+};
+
+// 依模式回傳該模式的設定項(data-driven;新增設定只改這裡)
+// num: 數值步進器  tog: 開關
+function lobbySettings(modeId) {
+  const num = (id, label, val, min, max, action, param, hint) =>
+    ({ type: 'num', id, label, val: val ?? min, min, max, action, param, hint });
+  const tog = (id, label, on, action) => ({ type: 'tog', id, label, on, action });
+  switch (modeId) {
+    case 'roll':  return [num('diceCount', '每人骰子數', state.diceCount, 1, 100, 'setDiceCount', 'count')];
+    case 'liars': return [num('diceCount', '每人起始骰子數', state.diceCount, 1, 100, 'setDiceCount', 'count')];
+    case 'roulette': return [
+      num('rouletteLives', '每人生命', state.rouletteLives, 0, 10, 'setRouletteLives', 'value', '0 = 單局模式（不淘汰）'),
+      num('rouletteAbility', '特殊功能次數', state.rouletteAbility, 0, 5, 'setRouletteAbility', 'value', '每輪可分配至「跳過」與「迴轉」'),
+    ];
+    case 'blackjack21': return [
+      num('blackjackLives', '每人生命', state.blackjackLives, 0, 10, 'setBlackjackLives', 'value', '0 = 單局模式（不淘汰）'),
+    ];
+    case 'speed': return [
+      num('speedSeconds', '每局秒數', state.speedSeconds, 10, 60, 'setSpeedSeconds', 'value'),
+      num('speedLives', '每人生命', state.speedLives, 0, 10, 'setSpeedLives', 'value', '0 = 單局模式（不淘汰）'),
+    ];
+    case 'mixed': return [
+      tog('loserDecides', '由輸家決定玩法', state.loserDecides, 'setLoserDecides'),
+      tog('autoRotate', '自動順位（紅黑單雙）', state.autoRotate, 'setAutoRotate'),
+    ];
+    default: return [];
+  }
+}
+
+// 步進器 / 手動輸入共用:讀 input 的 min/max/action/param,夾範圍後送出
+function fireNumSetting(inp) {
+  const min = Number(inp.min), max = Number(inp.max);
+  let v = Math.round(Number(inp.value) || min);
+  v = Math.max(min, Math.min(max, v));
+  inp.value = v;
+  act(inp.dataset.action, { [inp.dataset.param]: v });
+}
+
 function renderLobby() {
   const el = $('lobby');
   const isHost = state.you.isHost;
@@ -858,7 +905,7 @@ function renderLobby() {
   if (state.game && !lobbyExpanded) {
     el.classList.add('lobby-compact'); // 高度對齊 controls panel
     el.innerHTML = `<div class="lobby-row">`
-      + `<button id="start" ${state.modeId ? '' : 'disabled'}>${startButtonLabel()}</button>`
+      + `<button id="start" class="start-btn" ${state.modeId ? '' : 'disabled'}>${startButtonLabel()}</button>`
       + `<button id="changeMode" class="secondary">🔧 換模式</button>`
       + `</div>`;
     $('start')?.addEventListener('click', startRoundOnce);
@@ -867,63 +914,61 @@ function renderLobby() {
   }
 
   el.classList.remove('lobby-compact'); // 完整面板 → 取消精簡高度
-  // 房主控制(只顯示開放的模式,未開放的隱藏)
-  let html = '<div class="lobby-row"><span class="label">模式</span><div class="mode-btns">';
+
+  // 模式選擇:卡片網格(只顯示開放的模式,未開放的隱藏)
+  let html = '<div class="lobby-modes">';
   for (const m of state.modes) {
     if (!m.available) continue;
     const active = m.id === state.modeId ? 'active' : '';
-    html += `<button class="chip ${active}" data-mode="${m.id}">${esc(m.name)}</button>`;
+    const meta = MODE_META[m.id] || { icon: '🎲', desc: '' };
+    html += `<button class="mode-card ${active}" data-mode="${m.id}">`
+      + `<span class="mc-icon">${meta.icon}</span>`
+      + `<span class="mc-name">${esc(m.name)}</span>`
+      + `<span class="mc-desc">${esc(meta.desc)}</span>`
+      + `</button>`;
   }
-  html += '</div></div>';
+  html += '</div>';
 
-  if (state.modeId === 'roll' || state.modeId === 'liars') {
-    const label = state.modeId === 'liars' ? '每人起始骰子數' : '每人骰子數';
-    html += `<div class="lobby-row"><span class="label">${label}</span>
-      <input id="diceCount" type="number" min="1" max="100" value="${state.diceCount}" /></div>`;
-  }
-  if (state.modeId === 'roulette') {
-    html += `<div class="lobby-row"><span class="label">每人生命</span>
-      <input id="rouletteLives" type="number" min="0" max="10" value="${state.rouletteLives}" /></div>`;
-    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
-    html += `<div class="lobby-row"><span class="label">特殊功能次數</span>
-      <input id="rouletteAbility" type="number" min="0" max="5" value="${state.rouletteAbility}" /></div>`;
-    html += `<div class="lobby-row hint">每輪可分配至「跳過」與「迴轉」</div>`;
-  }
-  if (state.modeId === 'blackjack21') {
-    html += `<div class="lobby-row"><span class="label">每人生命</span>
-      <input id="blackjackLives" type="number" min="0" max="10" value="${state.blackjackLives}" /></div>`;
-    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
-  }
-  if (state.modeId === 'speed') {
-    html += `<div class="lobby-row"><span class="label">每局秒數</span>
-      <input id="speedSeconds" type="number" min="10" max="60" value="${state.speedSeconds}" /></div>`;
-    html += `<div class="lobby-row"><span class="label">每人生命</span>
-      <input id="speedLives" type="number" min="0" max="10" value="${state.speedLives}" /></div>`;
-    html += `<div class="lobby-row hint">0 = 單局模式（不淘汰）</div>`;
-  }
-  if (state.modeId === 'mixed') {
-    html += `<div class="lobby-row"><label class="auto-next">
-      <input type="checkbox" id="loserDecides" ${state.loserDecides ? 'checked' : ''}/> 由輸家決定玩法</label>
-      <label class="auto-next">
-      <input type="checkbox" id="autoRotate" ${state.autoRotate ? 'checked' : ''}/> 自動順位(紅黑單雙)</label></div>`;
+  // 該模式的設定卡
+  const settings = lobbySettings(state.modeId);
+  if (settings.length) {
+    html += '<div class="lobby-settings"><div class="ls-title">⚙️ 遊戲設定</div>';
+    for (const s of settings) {
+      if (s.type === 'num') {
+        html += `<div class="setting"><div class="s-main"><span class="s-label">${esc(s.label)}</span>`
+          + `<span class="stepper">`
+          + `<button type="button" class="st-btn" data-step="-1" aria-label="減少">−</button>`
+          + `<input id="${s.id}" type="number" min="${s.min}" max="${s.max}" value="${s.val}" data-action="${s.action}" data-param="${s.param}" />`
+          + `<button type="button" class="st-btn" data-step="1" aria-label="增加">+</button>`
+          + `</span></div>`
+          + (s.hint ? `<div class="s-hint">${esc(s.hint)}</div>` : '')
+          + `</div>`;
+      } else {
+        html += `<label class="setting toggle"><span class="s-label">${esc(s.label)}</span>`
+          + `<span class="switch"><input id="${s.id}" type="checkbox" data-action="${s.action}" ${s.on ? 'checked' : ''}/><span class="slider"></span></span>`
+          + `</label>`;
+      }
+    }
+    html += '</div>';
   }
 
-  const startLabel = startButtonLabel();
-  html += `<div class="lobby-row"><button id="start" ${state.modeId ? '' : 'disabled'}>${startLabel}</button></div>`;
+  html += `<button id="start" class="start-btn" ${state.modeId ? '' : 'disabled'}>${startButtonLabel()}</button>`;
   el.innerHTML = html;
 
   el.querySelectorAll('[data-mode]').forEach((b) =>
     b.addEventListener('click', () => act('setMode', { modeId: b.dataset.mode }))
   );
-  const dc = $('diceCount');
-  if (dc) dc.addEventListener('change', () => act('setDiceCount', { count: dc.value }));
-  $('blackjackLives')?.addEventListener('change', (e) => act('setBlackjackLives', { value: e.target.value }));
-  $('speedSeconds')?.addEventListener('change', (e) => act('setSpeedSeconds', { value: e.target.value }));
-  $('speedLives')?.addEventListener('change', (e) => act('setSpeedLives', { value: e.target.value }));
-  $('rouletteLives')?.addEventListener('change', (e) => act('setRouletteLives', { value: e.target.value }));
-  $('rouletteAbility')?.addEventListener('change', (e) => act('setRouletteAbility', { value: e.target.value }));
-  $('loserDecides')?.addEventListener('change', (e) => act('setLoserDecides', { on: e.target.checked }));
-  $('autoRotate')?.addEventListener('change', (e) => act('setAutoRotate', { on: e.target.checked }));
+  el.querySelectorAll('.st-btn').forEach((btn) => btn.addEventListener('click', () => {
+    const inp = btn.parentElement.querySelector('input');
+    const min = Number(inp.min), max = Number(inp.max);
+    let v = Math.round(Number(inp.value) || min) + Number(btn.dataset.step);
+    v = Math.max(min, Math.min(max, v));
+    if (String(v) !== inp.value) { inp.value = v; fireNumSetting(inp); }
+  }));
+  el.querySelectorAll('input[type="number"][data-action]').forEach((inp) =>
+    inp.addEventListener('change', () => fireNumSetting(inp)));
+  el.querySelectorAll('input[type="checkbox"][data-action]').forEach((cb) =>
+    cb.addEventListener('change', () => act(cb.dataset.action, { on: cb.checked })));
   $('start')?.addEventListener('click', startRoundOnce);
 }
 
